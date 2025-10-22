@@ -230,7 +230,6 @@ const RekapNilaiPage = () => {
   const { user } = useAuth();
   const router = useRouter();
   const [events, setEvents] = useState([]);
-  const [selectedEvent, setSelectedEvent] = useState("");
   const [activeEvent, setActiveEvent] = useState(null); // Untuk view Juri
   const [rekapData, setRekapData] = useState({
     isSpecialView: false,
@@ -238,11 +237,16 @@ const RekapNilaiPage = () => {
     aspeks: [],
     teams: [],
   });
+  const [filters, setFilters] = useState({ status: null, year: null });
+  const [availableYears, setAvailableYears] = useState([]);
+
   const [viewingTeamDetails, setViewingTeamDetails] = useState(null); // State untuk dialog detail
   const [rekapVersion, setRekapVersion] = useState(0); // Untuk memicu re-fetch
   const [loading, setLoading] = useState(true);
 
-  // Redirect jika role adalah koordinator
+  const isJuriView = user?.role === "juri";
+  const isAdminView = ["admin", "superadmin"].includes(user?.role);
+
   useEffect(() => {
     if (user?.role === "koordinator_team") {
       router.replace("/admin/rekap/koordinator-team");
@@ -259,12 +263,14 @@ const RekapNilaiPage = () => {
       const response = await api.get(endpoint);
       const eventList = response.data.events || [];
       setEvents(eventList);
-      if (
-        eventList.length > 0 &&
-        ["admin", "superadmin"].includes(user?.role)
-      ) {
-        setSelectedEvent(eventList[0].event_id);
-      }
+      const years = [
+        ...new Set(
+          eventList.map((e) =>
+            new Date(e.event_tanggal).getFullYear().toString()
+          )
+        ),
+      ].sort((a, b) => b - a);
+      setAvailableYears(years);
     } catch (error) {
       toast.error("Gagal memuat daftar event.");
     } finally {
@@ -276,9 +282,20 @@ const RekapNilaiPage = () => {
     fetchEvents();
   }, [fetchEvents]);
 
+  const filteredEvents = useMemo(() => {
+    return events.filter((event) => {
+      const eventYear = new Date(event.event_tanggal).getFullYear().toString();
+      const statusMatch = filters.status
+        ? event.event_status === filters.status
+        : true;
+      const yearMatch = filters.year ? eventYear === filters.year : true;
+      return statusMatch && yearMatch;
+    });
+  }, [events, filters]);
+
   // Fetch data rekap berdasarkan event yang dipilih (untuk admin/superadmin)
   useEffect(() => {
-    if (!selectedEvent || user?.role === "juri") {
+    if (!activeEvent || !isAdminView) {
       setLoading(false);
       return;
     }
@@ -286,7 +303,7 @@ const RekapNilaiPage = () => {
     const fetchRekap = async () => {
       setLoading(true);
       try {
-        const response = await api.get(`/rekap/${selectedEvent}`);
+        const response = await api.get(`/rekap/${activeEvent.event_id}`);
         setRekapData(response.data);
         console.log("Rekap Data Loaded:", response.data); // Untuk debugging
       } catch (error) {
@@ -304,7 +321,7 @@ const RekapNilaiPage = () => {
     };
 
     fetchRekap();
-  }, [selectedEvent, user?.role, rekapVersion]);
+  }, [activeEvent, isAdminView, rekapVersion]);
 
   // Fetch tim untuk event yang dipilih (khusus juri) saat event aktif dipilih
   useEffect(() => {
@@ -326,11 +343,6 @@ const RekapNilaiPage = () => {
     fetchTeamsForEvent();
   }, [activeEvent, user?.role]);
 
-  // Tentukan view berdasarkan role
-  const isJuriView = user?.role === "juri";
-  const isAdminView = ["admin", "superadmin"].includes(user?.role);
-  // Buat daftar tim yang akan ditampilkan, baik dari `teams` (untuk juri)
-  // maupun dari `rekap` (untuk admin/superadmin)
   const displayTeams = useMemo(() => {
     if (rekapData.teams && rekapData.teams.length > 0) {
       return rekapData.teams;
@@ -372,25 +384,24 @@ const RekapNilaiPage = () => {
       </header>
 
       <main className="flex flex-1 flex-col gap-4 p-4 pt-0">
-        {/* Tampilan untuk Juri */}
-        {isJuriView && (
+        {activeEvent ? (
           <>
-            {activeEvent ? (
-              // Tampilan Detail Event (Daftar Tim dengan Accordion)
+            <Button
+              variant="outline"
+              onClick={() => setActiveEvent(null)}
+              className="mb-4"
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" /> Kembali ke Daftar Event
+            </Button>
+
+            {/* Tampilan Detail untuk Juri */}
+            {isJuriView && (
               <div>
-                <Button
-                  variant="outline"
-                  onClick={() => setActiveEvent(null)}
-                  className="mb-4"
-                >
-                  <ArrowLeft className="mr-2 h-4 w-4" /> Kembali ke Daftar Event
-                </Button>
                 <h1 className="text-2xl font-semibold mb-2">
                   Daftar Tim: {activeEvent.event_name}
                 </h1>
-                {loading ? (
-                  <p>Memuat daftar tim...</p>
-                ) : displayTeams.length > 0 ? (
+                {loading && <p>Memuat daftar tim...</p>}
+                {!loading && displayTeams.length > 0 && (
                   <Accordion type="single" collapsible className="w-full">
                     {displayTeams.map((team) => (
                       <TeamDetailAccordion
@@ -401,135 +412,88 @@ const RekapNilaiPage = () => {
                       />
                     ))}
                   </Accordion>
-                ) : (
+                )}
+                {!loading && displayTeams.length === 0 && (
                   <p>Tidak ada tim di event ini.</p>
                 )}
               </div>
-            ) : (
-              // Tampilan Daftar Event
+            )}
+
+            {/* Tampilan Detail untuk Admin */}
+            {isAdminView && (
               <>
-                <h1 className="text-2xl font-semibold">Pilih Event</h1>
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {events.length > 0 ? (
-                    events.map((event) => (
-                      <Card key={event.event_id} className="flex flex-col">
-                        <CardHeader>
-                          <CardTitle>{event.event_name}</CardTitle>
-                          <CardDescription>
-                            {format(
-                              new Date(event.event_tanggal),
-                              "d MMMM yyyy",
-                              { locale: id }
-                            )}
-                          </CardDescription>
-                        </CardHeader>
-                        <CardFooter className="mt-auto">
-                          <Button
-                            className="w-full"
-                            onClick={() => setActiveEvent(event)}
+                <div className="rounded-lg border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="text-center">Peringkat</TableHead>
+                        <TableHead>Nama Tim</TableHead>
+                        {rekapData.aspeks?.map((k) => (
+                          <TableHead key={k} className="text-center">
+                            {k}
+                          </TableHead>
+                        ))}
+                        <TableHead className="text-center font-bold">
+                          Total
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {loading ? (
+                        <TableRow>
+                          <TableCell
+                            colSpan={rekapData.aspeks?.length + 3}
+                            className="h-24 text-center"
                           >
-                            Lihat Tim <ArrowRight className="ml-2 h-4 w-4" />
-                          </Button>
-                        </CardFooter>
-                      </Card>
-                    ))
-                  ) : (
-                    <p>Anda tidak ditugaskan pada event manapun.</p>
-                  )}
+                            Memuat data...
+                          </TableCell>
+                        </TableRow>
+                      ) : rekapData.rekap?.length > 0 ? (
+                        rekapData.rekap.map((s) => (
+                          <TableRow
+                            key={s.team_id}
+                            onClick={() =>
+                              setViewingTeamDetails(
+                                rekapData.details?.[s.team_id]
+                              )
+                            }
+                            className="cursor-pointer hover:bg-muted/50"
+                          >
+                            <TableCell className="text-center font-bold text-lg">
+                              {s.rank}
+                            </TableCell>
+                            <TableCell className="font-medium">
+                              <p>{s.team_name}</p>
+                              <p className="text-sm text-muted-foreground font-normal">
+                                {s.team_sekolah_instansi}
+                              </p>
+                            </TableCell>
+                            {rekapData.aspeks.map((k) => (
+                              <TableCell key={k} className="text-center">
+                                {s.scores[k]?.toFixed(2) || "0.00"}
+                              </TableCell>
+                            ))}
+                            <TableCell className="text-center font-semibold">
+                              {s.total.toFixed(2)}
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell
+                            colSpan={rekapData.aspeks?.length + 3}
+                            className="h-24 text-center"
+                          >
+                            Belum ada penilaian yang masuk.
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
                 </div>
               </>
             )}
-          </>
-        )}
 
-        {/* Tampilan untuk Admin & Superadmin */}
-        {isAdminView && (
-          <>
-            <div className="flex items-center justify-between">
-              <h1 className="text-2xl font-semibold">Rekapitulasi Peringkat</h1>
-              <div className="w-full max-w-xs">
-                <Select value={selectedEvent} onValueChange={setSelectedEvent}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Pilih Event" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {events.map((event) => (
-                      <SelectItem key={event.event_id} value={event.event_id}>
-                        {event.event_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="rounded-lg border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="text-center">Peringkat</TableHead>
-                    <TableHead>Nama Tim</TableHead>
-                    {rekapData.aspeks?.map((k) => (
-                      <TableHead key={k} className="text-center">
-                        {k}
-                      </TableHead>
-                    ))}
-                    <TableHead className="text-center font-bold">
-                      Total
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {loading ? (
-                    <TableRow>
-                      <TableCell
-                        colSpan={rekapData.aspeks?.length + 3}
-                        className="h-24 text-center"
-                      >
-                        Memuat data...
-                      </TableCell>
-                    </TableRow>
-                  ) : rekapData.rekap?.length > 0 ? (
-                    rekapData.rekap.map((s) => (
-                      <TableRow
-                        key={s.team_id}
-                        onClick={() =>
-                          setViewingTeamDetails(rekapData.details?.[s.team_id])
-                        }
-                        className="cursor-pointer hover:bg-muted/50"
-                      >
-                        <TableCell className="text-center font-bold text-lg">
-                          {s.rank}
-                        </TableCell>
-                        <TableCell className="font-medium">
-                          <p>{s.team_name}</p>
-                          <p className="text-sm text-muted-foreground font-normal">
-                            {s.team_sekolah_instansi}
-                          </p>
-                        </TableCell>
-                        {rekapData.aspeks.map((k) => (
-                          <TableCell key={k} className="text-center">
-                            {s.scores[k]?.toFixed(2) || "0.00"}
-                          </TableCell>
-                        ))}
-                        <TableCell className="text-center font-semibold">
-                          {s.total.toFixed(2)}
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  ) : (
-                    <TableRow>
-                      <TableCell
-                        colSpan={rekapData.aspeks?.length + 3}
-                        className="h-24 text-center"
-                      >
-                        Belum ada penilaian yang masuk.
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </div>
             {/* Dialog untuk menampilkan detail penilaian per juri */}
             <Dialog
               open={!!viewingTeamDetails}
@@ -581,6 +545,89 @@ const RekapNilaiPage = () => {
                 </div>
               </DialogContent>
             </Dialog>
+          </>
+        ) : (
+          <>
+            <div className="flex items-center justify-between">
+              <h1 className="text-2xl font-semibold">Pilih Event</h1>
+              <div className="flex gap-2">
+                {/* Filter Tahun */}
+                <Select
+                  value={filters.year || "all"}
+                  onValueChange={(value) => {
+                    const yearValue = value === "all" ? null : value;
+                    setFilters((prev) => ({ ...prev, year: yearValue }));
+                  }}
+                >
+                  <SelectTrigger className="w-[120px]">
+                    <SelectValue placeholder="Semua Tahun" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Semua Tahun</SelectItem>
+                    {availableYears.map((year) => (
+                      <SelectItem key={year} value={year}>
+                        {year}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {/* Filter Status */}
+                <Select
+                  value={filters.status || "all"}
+                  onValueChange={(value) => {
+                    const statusValue = value === "all" ? null : value;
+                    setFilters((prev) => ({
+                      ...prev,
+                      status: statusValue,
+                    }));
+                  }}
+                >
+                  <SelectTrigger className="w-[150px]">
+                    <SelectValue placeholder="Semua Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Semua Status</SelectItem>
+                    <SelectItem value="published">Published</SelectItem>
+                    <SelectItem value="draft">Draft</SelectItem>
+                    <SelectItem value="archived">Archived</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {loading ? (
+                <p>Memuat event...</p>
+              ) : filteredEvents.length > 0 ? (
+                filteredEvents.map((event) => (
+                  <Card key={event.event_id} className="flex flex-col">
+                    <CardHeader>
+                      <CardTitle>{event.event_name}</CardTitle>
+                      <CardDescription>
+                        {format(new Date(event.event_tanggal), "d MMMM yyyy", {
+                          locale: id,
+                        })}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardFooter className="mt-auto">
+                      <Button
+                        className="w-full"
+                        onClick={() => setActiveEvent(event)}
+                      >
+                        {isAdminView ? "Lihat Rekap" : "Lihat Tim"}
+                        <ArrowRight className="ml-2 h-4 w-4" />
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                ))
+              ) : (
+                <div className="col-span-full text-center py-10">
+                  <Frown className="mx-auto h-12 w-12 mb-4 text-muted-foreground" />
+                  <p className="text-muted-foreground">
+                    Tidak ada event yang cocok dengan filter Anda.
+                  </p>
+                </div>
+              )}
+            </div>
           </>
         )}
       </main>

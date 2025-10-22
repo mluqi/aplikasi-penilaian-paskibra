@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Header from "@/components/public/Header";
 import Hero from "@/components/public/Hero";
+import UpcomingEvents from "@/components/public/UpcomingEvents";
 import Mitra from "@/components/public/Mitra";
 import Features from "@/components/public/Features";
 import TargetAudience from "@/components/public/TargetAudience";
@@ -17,6 +18,7 @@ export default function Home() {
       <Header />
       <Hero />
       <Mitra />
+      <UpcomingEvents />
       <Features />
       <TargetAudience />
       <Testimonials />

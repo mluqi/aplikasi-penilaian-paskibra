@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import api from "@/service/api";
 import { toast } from "sonner";
-import Link from "next/link";
 import useAuth from "@/hooks/useAuth";
 import {
   Table,
@@ -14,12 +13,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Card,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -31,13 +30,18 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
+import { Button } from "@/components/ui/button";
+import { ArrowRight, Frown, ArrowLeft } from "lucide-react";
+import { format } from "date-fns";
+import { id } from "date-fns/locale";
 
 const KoordinatorEventRekapPage = () => {
   const { user } = useAuth();
   const [events, setEvents] = useState([]);
-  const [selectedEvent, setSelectedEvent] = useState("");
+  const [activeEvent, setActiveEvent] = useState(null);
   const [rekapData, setRekapData] = useState({ rekap: [], aspeks: [] });
   const [loading, setLoading] = useState(true);
+  const [loadingRekap, setLoadingRekap] = useState(false);
 
   useEffect(() => {
     const fetchEvents = async () => {
@@ -49,37 +53,35 @@ const KoordinatorEventRekapPage = () => {
           (event) => event.koordinator_id === user.id
         );
         setEvents(myEvents);
-        if (myEvents.length > 0) {
-          setSelectedEvent(myEvents[0].event_id);
-        }
       } catch (error) {
         toast.error("Gagal memuat daftar event Anda.");
+      } finally {
+        setLoading(false);
       }
     };
     fetchEvents();
   }, [user]);
 
   useEffect(() => {
-    if (!selectedEvent) {
-      setLoading(false);
+    if (!activeEvent) {
       return;
     }
 
     const fetchRekap = async () => {
-      setLoading(true);
+      setLoadingRekap(true);
       try {
-        const response = await api.get(`/rekap/${selectedEvent}`);
+        const response = await api.get(`/rekap/${activeEvent.event_id}`);
         setRekapData(response.data);
       } catch (error) {
         toast.error("Gagal memuat data rekapitulasi.");
         setRekapData({ rekap: [], aspeks: [] });
       } finally {
-        setLoading(false);
+        setLoadingRekap(false);
       }
     };
 
     fetchRekap();
-  }, [selectedEvent]);
+  }, [activeEvent]);
 
   return (
     <ProtectedRoute requiredAccess="view_recap">
@@ -104,88 +106,116 @@ const KoordinatorEventRekapPage = () => {
       </header>
 
       <main className="flex flex-1 flex-col gap-4 p-4 pt-0">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-semibold">Rekapitulasi Peringkat</h1>
-          <div className="w-full max-w-xs">
-            <Select value={selectedEvent} onValueChange={setSelectedEvent}>
-              <SelectTrigger>
-                <SelectValue placeholder="Pilih Event Anda" />
-              </SelectTrigger>
-              <SelectContent>
-                {events.map((event) => (
-                  <SelectItem key={event.event_id} value={event.event_id}>
-                    {event.event_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-
-        <div className="rounded-lg border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="text-center">Peringkat</TableHead>
-                <TableHead>Nama Tim</TableHead>
-                {rekapData.aspeks?.map((k) => (
-                  <TableHead key={k} className="text-center">
-                    {k}
-                  </TableHead>
-                ))}
-                <TableHead className="text-center font-bold">Total</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={rekapData.aspeks?.length + 3}
-                    className="h-24 text-center"
-                  >
-                    Memuat data...
-                  </TableCell>
-                </TableRow>
-              ) : rekapData.rekap?.length > 0 ? (
-                rekapData.rekap.map((s) => (
-                  <TableRow key={s.team_id}>
-                    <TableCell className="text-center font-bold text-lg">
-                      {s.rank}
-                    </TableCell>
-                    <TableCell className="font-medium">
-                      <Link
-                        href={`/admin/rekap/${selectedEvent}/${s.team_id}`}
-                        className="hover:underline"
-                      >
-                        {s.team_name}
-                        <p className="text-sm text-muted-foreground font-normal">
-                          {s.team_sekolah_instansi}
-                        </p>
-                      </Link>
-                    </TableCell>
-                    {rekapData.aspeks.map((k) => (
-                      <TableCell key={k} className="text-center">
-                        {s.scores[k]?.toFixed(2) || "0.00"}
-                      </TableCell>
+        {activeEvent ? (
+          <>
+            <Button
+              variant="outline"
+              onClick={() => setActiveEvent(null)}
+              className="mb-4 w-fit"
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" /> Kembali ke Daftar Event
+            </Button>
+            <h1 className="text-2xl font-semibold">
+              Rekapitulasi Peringkat: {activeEvent.event_name}
+            </h1>
+            <div className="rounded-lg border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="text-center">Peringkat</TableHead>
+                    <TableHead>Nama Tim</TableHead>
+                    {rekapData.aspeks?.map((k) => (
+                      <TableHead key={k} className="text-center">
+                        {k}
+                      </TableHead>
                     ))}
-                    <TableCell className="text-center font-semibold">
-                      {s.total.toFixed(2)}
-                    </TableCell>
+                    <TableHead className="text-center font-bold">
+                      Total
+                    </TableHead>
                   </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {loadingRekap ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={rekapData.aspeks?.length + 3}
+                        className="h-24 text-center"
+                      >
+                        Memuat data rekapitulasi...
+                      </TableCell>
+                    </TableRow>
+                  ) : rekapData.rekap?.length > 0 ? (
+                    rekapData.rekap.map((s) => (
+                      <TableRow key={s.team_id}>
+                        <TableCell className="text-center font-bold text-lg">
+                          {s.rank}
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          <p>{s.team_name}</p>
+                          <p className="text-sm text-muted-foreground font-normal">
+                            {s.team_sekolah_instansi}
+                          </p>
+                        </TableCell>
+                        {rekapData.aspeks.map((k) => (
+                          <TableCell key={k} className="text-center">
+                            {s.scores[k]?.toFixed(2) || "0.00"}
+                          </TableCell>
+                        ))}
+                        <TableCell className="text-center font-semibold">
+                          {s.total.toFixed(2)}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell
+                        colSpan={rekapData.aspeks?.length + 3}
+                        className="h-24 text-center"
+                      >
+                        Belum ada penilaian yang masuk.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </>
+        ) : (
+          <>
+            <h1 className="text-2xl font-semibold">Pilih Event Anda</h1>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {loading ? (
+                <p>Memuat event...</p>
+              ) : events.length > 0 ? (
+                events.map((event) => (
+                  <Card key={event.event_id} className="flex flex-col">
+                    <CardHeader>
+                      <CardTitle>{event.event_name}</CardTitle>
+                      <CardDescription>
+                        {format(new Date(event.event_tanggal), "d MMMM yyyy", {
+                          locale: id,
+                        })}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardFooter className="mt-auto">
+                      <Button
+                        className="w-full"
+                        onClick={() => setActiveEvent(event)}
+                      >
+                        Lihat Rekap <ArrowRight className="ml-2 h-4 w-4" />
+                      </Button>
+                    </CardFooter>
+                  </Card>
                 ))
               ) : (
-                <TableRow>
-                  <TableCell
-                    colSpan={rekapData.aspeks?.length + 3}
-                    className="h-24 text-center"
-                  >
-                    Belum ada penilaian yang masuk.
-                  </TableCell>
-                </TableRow>
+                <div className="col-span-full text-center text-muted-foreground py-10">
+                  <Frown className="mx-auto h-12 w-12 mb-4" />
+                  <p>Anda tidak mengelola event manapun.</p>
+                </div>
               )}
-            </TableBody>
-          </Table>
-        </div>
+            </div>
+          </>
+        )}
       </main>
     </ProtectedRoute>
   );
