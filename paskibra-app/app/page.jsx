@@ -14,7 +14,7 @@ import Pricing from "@/components/public/Pricing";
 
 export default function Home() {
   return (
-    <>
+    <main className="flex flex-col overflow-hidden">
       <Header />
       <Hero />
       <Mitra />
@@ -27,6 +27,6 @@ export default function Home() {
       <FAQ />
       <ScrollToTopButton />
       <Footer />
-    </>
+    </main>
   );
 }

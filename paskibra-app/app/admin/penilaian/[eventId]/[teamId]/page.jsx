@@ -22,7 +22,16 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { ArrowLeft, Check, Lock } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import {
+  ArrowLeft,
+  Check,
+  Lock,
+  CheckCircle2,
+  AlertCircle,
+  Info,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -68,7 +77,7 @@ const ScoringPage = () => {
 
   const allSubAspekIds = useMemo(() => {
     return aspeks.flatMap((aspek) =>
-      aspek.SubAspeks.map((sub) => sub.subaspek_id)
+      aspek.SubAspeks.map((sub) => sub.subaspek_id),
     );
   }, [aspeks]);
 
@@ -76,6 +85,13 @@ const ScoringPage = () => {
     if (allSubAspekIds.length === 0) return false;
     return allSubAspekIds.every((id) => scores[id] !== undefined);
   }, [scores, allSubAspekIds]);
+
+  const filledSubAspeksCount = Object.keys(scores).length;
+  const totalSubAspeksCount = allSubAspekIds.length;
+  const progressPercentage =
+    totalSubAspeksCount === 0
+      ? 0
+      : (filledSubAspeksCount / totalSubAspeksCount) * 100;
 
   useEffect(() => {
     const fetchData = async () => {
@@ -94,14 +110,14 @@ const ScoringPage = () => {
         setAspeks(aspekRes.data);
 
         const submission = submittedRes.data.submissions.find(
-          (s) => s.team_id === teamId
+          (s) => s.team_id === teamId,
         );
 
         if (submission) {
           setPenilaianId(submission.penilaian_id);
           setIsLocked(submission.is_lock);
           const response = await api.get(
-            `/penilaian/${submission.penilaian_id}`
+            `/penilaian/${submission.penilaian_id}`,
           );
           const existingData = response.data;
           setCatatan(existingData.catatan || "");
@@ -157,7 +173,7 @@ const ScoringPage = () => {
       router.push(`/admin/penilaian/${eventId}`);
     } catch (error) {
       toast.error(
-        error.response?.data?.message || "Gagal menyimpan penilaian."
+        error.response?.data?.message || "Gagal menyimpan penilaian.",
       );
     } finally {
       setIsSubmitting(false);
@@ -223,108 +239,217 @@ const ScoringPage = () => {
           >
             <ArrowLeft className="mr-2 h-4 w-4" /> Kembali
           </Button>
-          <Card>
-            <CardHeader className="text-center">
-              <CardTitle>Form Penilaian: {team.team_name}</CardTitle>
-              <CardDescription>
-                Event: {event.event_name} | Sekolah/Instansi:{" "}
-                {team.team_sekolah_instansi}
+          <Card className="shadow-sm border-border/50 overflow-hidden">
+            <CardHeader className="text-center bg-muted/10 border-b pb-6">
+              <CardTitle className="text-2xl font-bold">
+                Form Penilaian: {team.team_name}
+              </CardTitle>
+              <CardDescription className="text-base mt-2">
+                Event:{" "}
+                <span className="font-semibold text-foreground">
+                  {event.event_name}
+                </span>{" "}
+                | Sekolah/Instansi:{" "}
+                <span className="font-semibold text-foreground">
+                  {team.team_sekolah_instansi}
+                </span>
               </CardDescription>
+
+              {/* Progress Bar */}
+              <div className="mt-6 max-w-xl mx-auto w-full">
+                <div className="flex justify-between items-center mb-2 text-sm">
+                  <span className="font-medium text-muted-foreground">
+                    Progres Penilaian
+                  </span>
+                  <span
+                    className={cn(
+                      "font-bold",
+                      isFormComplete ? "text-emerald-600" : "text-primary",
+                    )}
+                  >
+                    {filledSubAspeksCount} / {totalSubAspeksCount} Sub-aspek
+                  </span>
+                </div>
+                <div className="h-2.5 w-full bg-muted rounded-full overflow-hidden">
+                  <div
+                    className={cn(
+                      "h-full transition-all duration-500 ease-out",
+                      isFormComplete ? "bg-emerald-500" : "bg-primary",
+                    )}
+                    style={{ width: `${progressPercentage}%` }}
+                  />
+                </div>
+              </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pt-6">
               <Accordion
                 type="multiple"
                 defaultValue={aspeks.map((a) => a.aspek_id)}
                 className="w-full space-y-4"
               >
-                {aspeks.map((aspek) => (
-                  <AccordionItem
-                    key={aspek.aspek_id}
-                    value={aspek.aspek_id}
-                    className="border rounded-lg px-4"
-                  >
-                    <AccordionTrigger className="hover:no-underline">
-                      <div className="flex flex-col items-start">
-                        <span className="font-semibold">
-                          {aspek.nama_aspek}
-                        </span>
-                        <span className="text-sm text-muted-foreground">
-                          Bobot: {aspek.bobot}%
-                        </span>
-                      </div>
-                    </AccordionTrigger>
-                    <AccordionContent>
-                      <div className="divide-y divide-border pt-2">
-                        {aspek.SubAspeks.map((sub) => (
-                          <div
-                            key={sub.subaspek_id}
-                            className="flex items-center justify-between gap-4 py-3"
-                          >
-                            <div>
-                              <Label
-                                htmlFor={sub.subaspek_id}
-                                className="font-medium"
-                              >
-                                {sub.nama_subaspek}
-                              </Label>
-                              <p className="text-xs text-muted-foreground">
-                                Bobot: {sub.bobot}%
-                              </p>
-                            </div>
-                            <div className="flex flex-wrap justify-end gap-1.5 w-full md:max-w-sm lg:max-w-4xl">
-                              {scoreOptions.map((scoreValue) => (
-                                <Button
-                                  key={scoreValue}
-                                  type="button"
-                                  variant={
-                                    scores[sub.subaspek_id] === scoreValue
-                                      ? "default"
-                                      : "outline"
-                                  }
-                                  onClick={() =>
-                                    handleScoreChange(
-                                      sub.subaspek_id,
-                                      scoreValue
-                                    )
-                                  }
-                                  disabled={isLocked}
-                                  className="h-12 w-16 text-sm"
-                                >
-                                  {scoreValue}
-                                </Button>
-                              ))}
-                            </div>
+                {aspeks.map((aspek) => {
+                  const aspectSubIds = aspek.SubAspeks.map(
+                    (s) => s.subaspek_id,
+                  );
+                  const filledInThisAspect = aspectSubIds.filter(
+                    (id) => scores[id] !== undefined,
+                  ).length;
+                  const isAspectComplete =
+                    filledInThisAspect === aspectSubIds.length;
+
+                  return (
+                    <AccordionItem
+                      key={aspek.aspek_id}
+                      value={aspek.aspek_id}
+                      className={cn(
+                        "border rounded-xl px-4 md:px-6 transition-colors",
+                        isAspectComplete
+                          ? "bg-emerald-50/30 dark:bg-emerald-950/10 border-emerald-100 dark:border-emerald-900/30"
+                          : "bg-white dark:bg-gray-900",
+                      )}
+                    >
+                      <AccordionTrigger className="hover:no-underline py-4">
+                        <div className="flex items-center justify-between w-full pr-4">
+                          <div className="flex flex-col items-start text-left">
+                            <span className="font-bold text-lg">
+                              {aspek.nama_aspek}
+                            </span>
+                            <span className="text-sm text-muted-foreground mt-1 flex items-center gap-2">
+                              <span className="bg-muted px-2 py-0.5 rounded-md font-medium text-xs border">
+                                Bobot: {aspek.bobot}%
+                              </span>
+                            </span>
                           </div>
-                        ))}
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-                ))}
+                          <div>
+                            {isAspectComplete ? (
+                              <Badge className="bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm gap-1 pl-1.5 pointer-events-none">
+                                <CheckCircle2 className="h-3.5 w-3.5" /> Selesai
+                              </Badge>
+                            ) : (
+                              <Badge
+                                variant="outline"
+                                className="text-muted-foreground gap-1 border-dashed bg-background pointer-events-none"
+                              >
+                                <AlertCircle className="h-3.5 w-3.5" />{" "}
+                                {filledInThisAspect}/{aspectSubIds.length}{" "}
+                                Dinilai
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      </AccordionTrigger>
+                      <AccordionContent>
+                        <div className="divide-y divide-border/50 pt-2">
+                          {aspek.SubAspeks.map((sub) => (
+                            <div
+                              key={sub.subaspek_id}
+                              className="flex flex-col gap-3 py-5"
+                            >
+                              <div className="flex justify-between items-start gap-4">
+                                <div>
+                                  <Label
+                                    htmlFor={sub.subaspek_id}
+                                    className="text-base font-semibold"
+                                  >
+                                    {sub.nama_subaspek}
+                                  </Label>
+                                  <p className="text-sm text-muted-foreground mt-1">
+                                    Bobot penilaian:{" "}
+                                    <span className="font-medium text-foreground">
+                                      {sub.bobot}%
+                                    </span>
+                                  </p>
+                                </div>
+                                {scores[sub.subaspek_id] !== undefined && (
+                                  <div className="hidden md:flex h-10 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary font-bold text-lg">
+                                    {scores[sub.subaspek_id]}
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Interactive Score Grid */}
+                              <div className="grid grid-cols-5 sm:grid-cols-10 gap-2 mt-2">
+                                {scoreOptions.map((scoreValue) => {
+                                  const isSelected =
+                                    scores[sub.subaspek_id] === scoreValue;
+                                  return (
+                                    <button
+                                      key={scoreValue}
+                                      type="button"
+                                      onClick={() =>
+                                        handleScoreChange(
+                                          sub.subaspek_id,
+                                          scoreValue,
+                                        )
+                                      }
+                                      disabled={isLocked}
+                                      className={cn(
+                                        "h-12 md:h-10 rounded-xl text-sm font-bold transition-all duration-200 flex items-center justify-center border-2",
+                                        isSelected
+                                          ? "bg-primary text-primary-foreground border-primary shadow-md scale-[1.02]"
+                                          : "bg-background text-muted-foreground border-border/50 hover:border-primary/40 hover:bg-muted",
+                                        isLocked &&
+                                          !isSelected &&
+                                          "opacity-50 cursor-not-allowed hover:border-border/50 hover:bg-background",
+                                      )}
+                                    >
+                                      {scoreValue}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+                  );
+                })}
               </Accordion>
-              <div className="mt-8">
-                <Label htmlFor="catatan">Catatan (Opsional)</Label>
-                <Textarea
-                  id="catatan"
-                  value={catatan}
-                  onChange={(e) => setCatatan(e.target.value)}
-                  disabled={isLocked}
-                  placeholder="Tambahkan catatan atau masukan untuk tim..."
-                  className="mt-2"
-                />
+              <div className="mt-8 bg-amber-50/50 dark:bg-amber-950/10 p-4 md:p-6 rounded-xl border border-amber-100 dark:border-amber-900/30">
+                <div className="flex items-start gap-3">
+                  <Info className="h-5 w-5 text-amber-600 dark:text-amber-500 shrink-0 mt-0.5" />
+                  <div className="w-full">
+                    <Label
+                      htmlFor="catatan"
+                      className="text-amber-900 dark:text-amber-200 font-semibold text-base"
+                    >
+                      Catatan Evaluasi Juri (Opsional)
+                    </Label>
+                    <p className="text-sm text-amber-700/70 dark:text-amber-400/70 mb-3 mt-1">
+                      Berikan masukan, kritik, atau saran membangun untuk tim
+                      ini.
+                    </p>
+                    <Textarea
+                      id="catatan"
+                      value={catatan}
+                      onChange={(e) => setCatatan(e.target.value)}
+                      disabled={isLocked}
+                      placeholder="Ketikkan catatan evaluasi di sini..."
+                      className="min-h-[100px] bg-white dark:bg-gray-900 border-amber-200 dark:border-amber-800/50 focus-visible:ring-amber-500/30"
+                    />
+                  </div>
+                </div>
               </div>
             </CardContent>
-            <CardFooter>
-              <div className="w-[50%] flex flex-col sm:flex-row gap-2">
+            <CardFooter className="bg-muted/10 border-t p-6 flex-col sm:flex-row gap-3">
+              <div className="w-full flex flex-col sm:flex-row gap-3 md:justify-end">
                 <Button
                   type="submit"
-                  className="w-full"
+                  size="lg"
+                  className={cn(
+                    "w-full sm:w-auto min-w-[200px] text-base",
+                    isFormComplete
+                      ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+                      : "",
+                  )}
                   disabled={isSubmitting || !isFormComplete || isLocked}
                 >
                   {isSubmitting ? (
                     "Menyimpan..."
                   ) : (
                     <>
-                      <Check className="mr-2 h-4 w-4" /> Simpan Penilaian
+                      <Check className="mr-2 h-5 w-5" /> Simpan
                     </>
                   )}
                 </Button>
@@ -334,10 +459,11 @@ const ScoringPage = () => {
                       <Button
                         type="button"
                         variant="destructive"
-                        className="w-full"
+                        size="lg"
+                        className="w-full sm:w-auto text-base"
                         disabled={isLocking}
                       >
-                        <Lock className="mr-2 h-4 w-4" /> Kunci Penilaian
+                        <Lock className="mr-2 h-5 w-5" /> Kunci Penilaian
                       </Button>
                     </AlertDialogTrigger>
                     <AlertDialogContent>

@@ -60,11 +60,16 @@ import {
   Loader2,
   Lock,
   Unlock,
+  Search,
+  MapPin,
+  CalendarIcon,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import useAuth from "@/hooks/useAuth";
 import { format } from "date-fns";
 import { id } from "date-fns/locale";
+import { Input } from "@/components/ui/input";
+import Image from "next/image";
 
 // --- Komponen Detail Penilaian untuk Accordion ---
 const JuriScoreCard = ({ penilaian, onUnlockSuccess }) => (
@@ -145,7 +150,7 @@ const JuriScoreCard = ({ penilaian, onUnlockSuccess }) => (
                   {parseFloat(subNilai.nilai).toFixed(2)}
                 </TableCell>
               </TableRow>
-            ))
+            )),
           )}
         </TableBody>
       </Table>
@@ -162,7 +167,7 @@ const TeamDetailAccordion = ({ team, eventId, onDataUpdate }) => {
     setIsLoading(true);
     try {
       const response = await api.get(
-        `/penilaian/detail/${eventId}/${team.team_id}`
+        `/penilaian/detail/${eventId}/${team.team_id}`,
       );
       setDetails(response.data.details || []); // Ambil data dari properti 'details'
     } catch (error) {
@@ -179,8 +184,8 @@ const TeamDetailAccordion = ({ team, eventId, onDataUpdate }) => {
       // Perbarui state lokal untuk mencerminkan perubahan
       setDetails((prevDetails) =>
         prevDetails.map((p) =>
-          p.penilaian_id === penilaianId ? { ...p, is_lock: false } : p
-        )
+          p.penilaian_id === penilaianId ? { ...p, is_lock: false } : p,
+        ),
       );
       // Panggil callback untuk memperbarui data di level atas jika perlu
       if (onDataUpdate) {
@@ -238,6 +243,7 @@ const RekapNilaiPage = () => {
     teams: [],
   });
   const [filters, setFilters] = useState({ status: null, year: null });
+  const [searchQuery, setSearchQuery] = useState("");
   const [availableYears, setAvailableYears] = useState([]);
 
   const [viewingTeamDetails, setViewingTeamDetails] = useState(null); // State untuk dialog detail
@@ -266,8 +272,8 @@ const RekapNilaiPage = () => {
       const years = [
         ...new Set(
           eventList.map((e) =>
-            new Date(e.event_tanggal).getFullYear().toString()
-          )
+            new Date(e.event_tanggal).getFullYear().toString(),
+          ),
         ),
       ].sort((a, b) => b - a);
       setAvailableYears(years);
@@ -289,9 +295,14 @@ const RekapNilaiPage = () => {
         ? event.event_status === filters.status
         : true;
       const yearMatch = filters.year ? eventYear === filters.year : true;
-      return statusMatch && yearMatch;
+      const searchMatch =
+        event.event_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (event.event_tempat &&
+          event.event_tempat.toLowerCase().includes(searchQuery.toLowerCase()));
+
+      return statusMatch && yearMatch && searchMatch;
     });
-  }, [events, filters]);
+  }, [events, filters, searchQuery]);
 
   // Fetch data rekap berdasarkan event yang dipilih (untuk admin/superadmin)
   useEffect(() => {
@@ -386,13 +397,51 @@ const RekapNilaiPage = () => {
       <main className="flex flex-1 flex-col gap-4 p-4 pt-0">
         {activeEvent ? (
           <>
-            <Button
-              variant="outline"
-              onClick={() => setActiveEvent(null)}
-              className="mb-4"
-            >
-              <ArrowLeft className="mr-2 h-4 w-4" /> Kembali ke Daftar Event
-            </Button>
+            {/* Header Event Terpilih */}
+            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-border/50 p-4 md:p-6 mb-2">
+              <div className="flex flex-col md:flex-row justify-between gap-4 items-start md:items-center">
+                <div className="flex items-center gap-4">
+                  <div className="relative w-16 h-20 md:w-20 md:h-28 shrink-0 rounded-lg overflow-hidden border shadow-sm bg-muted/50">
+                    <Image
+                      src={
+                        activeEvent.event_poster
+                          ? `${process.env.NEXT_PUBLIC_API_URL}${activeEvent.event_poster}`
+                          : "/default-poster.png"
+                      }
+                      alt={`Poster ${activeEvent.event_name}`}
+                      fill
+                      className="object-cover"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <h1 className="text-xl md:text-2xl font-bold tracking-tight text-foreground line-clamp-2">
+                      {activeEvent.event_name}
+                    </h1>
+                    <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground mt-2">
+                      <span className="flex items-center gap-1.5">
+                        <CalendarIcon className="w-4 h-4 text-primary" />{" "}
+                        {format(
+                          new Date(activeEvent.event_tanggal),
+                          "d MMMM yyyy",
+                          { locale: id },
+                        )}
+                      </span>
+                      <span className="flex items-center gap-1.5">
+                        <MapPin className="w-4 h-4 text-primary" />{" "}
+                        {activeEvent.event_tempat}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={() => setActiveEvent(null)}
+                  className="w-full md:w-auto shadow-sm shrink-0"
+                >
+                  <ArrowLeft className="mr-2 h-4 w-4" /> Ganti Event
+                </Button>
+              </div>
+            </div>
 
             {/* Tampilan Detail untuk Juri */}
             {isJuriView && (
@@ -454,7 +503,7 @@ const RekapNilaiPage = () => {
                             key={s.team_id}
                             onClick={() =>
                               setViewingTeamDetails(
-                                rekapData.details?.[s.team_id]
+                                rekapData.details?.[s.team_id],
                               )
                             }
                             className="cursor-pointer hover:bg-muted/50"
@@ -515,7 +564,7 @@ const RekapNilaiPage = () => {
                         onUnlockSuccess={async (penilaianId) => {
                           try {
                             const response = await api.patch(
-                              `/penilaian/unlock/${penilaianId}`
+                              `/penilaian/unlock/${penilaianId}`,
                             );
                             toast.success(response.data.message);
                             // Perbarui state dialog secara lokal
@@ -523,15 +572,15 @@ const RekapNilaiPage = () => {
                               prev.map((p) =>
                                 p.penilaian_id === penilaianId
                                   ? { ...p, is_lock: false }
-                                  : p
-                              )
+                                  : p,
+                              ),
                             );
                             // Memicu re-fetch data di latar belakang
                             setRekapVersion((v) => v + 1);
                           } catch (error) {
                             toast.error(
                               error.response?.data?.message ||
-                                "Gagal membuka kunci."
+                                "Gagal membuka kunci.",
                             );
                           }
                         }}
@@ -548,82 +597,156 @@ const RekapNilaiPage = () => {
           </>
         ) : (
           <>
-            <div className="flex items-center justify-between">
-              <h1 className="text-2xl font-semibold">Pilih Event</h1>
-              <div className="flex gap-2">
-                {/* Filter Tahun */}
-                <Select
-                  value={filters.year || "all"}
-                  onValueChange={(value) => {
-                    const yearValue = value === "all" ? null : value;
-                    setFilters((prev) => ({ ...prev, year: yearValue }));
-                  }}
-                >
-                  <SelectTrigger className="w-[120px]">
-                    <SelectValue placeholder="Semua Tahun" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Semua Tahun</SelectItem>
-                    {availableYears.map((year) => (
-                      <SelectItem key={year} value={year}>
-                        {year}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {/* Filter Status */}
-                <Select
-                  value={filters.status || "all"}
-                  onValueChange={(value) => {
-                    const statusValue = value === "all" ? null : value;
-                    setFilters((prev) => ({
-                      ...prev,
-                      status: statusValue,
-                    }));
-                  }}
-                >
-                  <SelectTrigger className="w-[150px]">
-                    <SelectValue placeholder="Semua Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Semua Status</SelectItem>
-                    <SelectItem value="published">Published</SelectItem>
-                    <SelectItem value="draft">Draft</SelectItem>
-                    <SelectItem value="archived">Archived</SelectItem>
-                  </SelectContent>
-                </Select>
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-6">
+              <div>
+                <h1 className="text-2xl font-bold tracking-tight">
+                  Pilih Event
+                </h1>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Pilih event untuk melihat hasil rekapitulasi nilai dan
+                  klasemen akhir.
+                </p>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+                <div className="relative w-full sm:w-64">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Cari nama event..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-9 bg-white dark:bg-gray-900 shadow-sm"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  {/* Filter Tahun */}
+                  <Select
+                    value={filters.year || "all"}
+                    onValueChange={(value) => {
+                      const yearValue = value === "all" ? null : value;
+                      setFilters((prev) => ({ ...prev, year: yearValue }));
+                    }}
+                  >
+                    <SelectTrigger className="w-full sm:w-[130px] bg-white dark:bg-gray-900 shadow-sm">
+                      <SelectValue placeholder="Tahun" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Semua Tahun</SelectItem>
+                      {availableYears.map((year) => (
+                        <SelectItem key={year} value={year}>
+                          {year}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {/* Filter Status */}
+                  <Select
+                    value={filters.status || "all"}
+                    onValueChange={(value) => {
+                      const statusValue = value === "all" ? null : value;
+                      setFilters((prev) => ({
+                        ...prev,
+                        status: statusValue,
+                      }));
+                    }}
+                  >
+                    <SelectTrigger className="w-full sm:w-[150px] bg-white dark:bg-gray-900 shadow-sm">
+                      <SelectValue placeholder="Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Semua Status</SelectItem>
+                      <SelectItem value="published">Published</SelectItem>
+                      <SelectItem value="draft">Draft</SelectItem>
+                      <SelectItem value="archived">Archived</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {loading ? (
-                <p>Memuat event...</p>
+                Array.from({ length: 4 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="h-[340px] rounded-xl bg-muted/50 animate-pulse border"
+                  />
+                ))
               ) : filteredEvents.length > 0 ? (
                 filteredEvents.map((event) => (
-                  <Card key={event.event_id} className="flex flex-col">
-                    <CardHeader>
-                      <CardTitle>{event.event_name}</CardTitle>
-                      <CardDescription>
-                        {format(new Date(event.event_tanggal), "d MMMM yyyy", {
-                          locale: id,
-                        })}
-                      </CardDescription>
-                    </CardHeader>
-                    <CardFooter className="mt-auto">
+                  <Card
+                    key={event.event_id}
+                    className="group overflow-hidden flex flex-col hover:shadow-xl transition-all duration-300 border-border/50"
+                  >
+                    <div className="relative h-56 w-full bg-muted/50 border-b border-border/50">
+                      <Image
+                        src={
+                          event.event_poster
+                            ? `${process.env.NEXT_PUBLIC_API_URL}${event.event_poster}`
+                            : "/default-poster.png"
+                        }
+                        alt={`Poster ${event.event_name}`}
+                        fill
+                        className="object-cover group-hover:scale-105 transition-transform duration-500"
+                        onError={(e) =>
+                          (e.currentTarget.src = "/default-poster.png")
+                        }
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-80 pointer-events-none" />
+                      <div className="absolute top-3 left-3 z-10 flex gap-2">
+                        <Badge
+                          variant={
+                            event.event_status === "published"
+                              ? "default"
+                              : event.event_status === "draft"
+                                ? "secondary"
+                                : "destructive"
+                          }
+                          className="shadow-sm capitalize font-medium px-2.5"
+                        >
+                          {event.event_status}
+                        </Badge>
+                      </div>
+                    </div>
+                    <CardContent className="p-5 flex-1">
+                      <h3 className="font-bold text-[17px] leading-tight line-clamp-2 mb-3 group-hover:text-primary transition-colors text-foreground">
+                        {event.event_name}
+                      </h3>
+                      <div className="space-y-2 text-sm text-muted-foreground">
+                        <div className="flex items-center gap-2">
+                          <CalendarIcon className="h-4 w-4 opacity-70 shrink-0 text-primary" />
+                          <span className="truncate">
+                            {format(
+                              new Date(event.event_tanggal),
+                              "d MMMM yyyy",
+                              { locale: id },
+                            )}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <MapPin className="h-4 w-4 opacity-70 shrink-0 text-primary" />
+                          <span className="truncate">{event.event_tempat}</span>
+                        </div>
+                      </div>
+                    </CardContent>
+                    <CardFooter className="p-5 pt-0">
                       <Button
-                        className="w-full"
+                        className="w-full shadow-sm group-hover:bg-primary/90 transition-colors"
                         onClick={() => setActiveEvent(event)}
                       >
-                        {isAdminView ? "Lihat Rekap" : "Lihat Tim"}
+                        {isAdminView ? "Lihat Rekap Nilai" : "Mulai Penilaian"}
                         <ArrowRight className="ml-2 h-4 w-4" />
                       </Button>
                     </CardFooter>
                   </Card>
                 ))
               ) : (
-                <div className="col-span-full text-center py-10">
-                  <Frown className="mx-auto h-12 w-12 mb-4 text-muted-foreground" />
-                  <p className="text-muted-foreground">
-                    Tidak ada event yang cocok dengan filter Anda.
+                <div className="col-span-full flex flex-col items-center justify-center py-20 text-center border rounded-2xl bg-muted/20 border-dashed">
+                  <Frown className="h-14 w-14 mb-4 text-muted-foreground/40" />
+                  <p className="text-xl font-semibold text-foreground">
+                    Event Tidak Ditemukan
+                  </p>
+                  <p className="text-muted-foreground mt-2 max-w-md">
+                    Tidak ada event yang cocok dengan kata kunci atau filter
+                    pencarian Anda saat ini. Silakan coba kata kunci lain.
                   </p>
                 </div>
               )}

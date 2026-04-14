@@ -68,7 +68,7 @@ exports.getRekapByEvent = async (req, res) => {
     });
     const aspekHeaders = masterAspeks.map((a) => a.nama_aspek);
     const aspekIdToNameMap = new Map(
-      masterAspeks.map((a) => [a.aspek_id, a.nama_aspek])
+      masterAspeks.map((a) => [a.aspek_id, a.nama_aspek]),
     );
 
     // 2. Ambil data rekapitulasi utama dan detail penilaian secara paralel
@@ -148,7 +148,7 @@ exports.getRekapByEvent = async (req, res) => {
       const aspekName = aspekIdToNameMap.get(score.aspek_id);
       if (aspekName)
         scoresByTeam.get(score.team_id)[aspekName] = parseFloat(
-          score.avg_score
+          score.avg_score,
         );
     });
 
@@ -201,11 +201,11 @@ exports.getPublicRekapByEvent = async (req, res) => {
     });
     const aspekHeaders = masterAspeks.map((a) => a.nama_aspek);
     const aspekIdToNameMap = new Map(
-      masterAspeks.map((a) => [a.aspek_id, a.nama_aspek])
+      masterAspeks.map((a) => [a.aspek_id, a.nama_aspek]),
     );
 
     // 2. Ambil nilai akhir dan rata-rata nilai per aspek untuk semua tim
-    const [rekapList, avgAspectScores] = await Promise.all([
+    const [rekapList, avgAspectScores, donationList] = await Promise.all([
       RekapNilai.findAll({
         where: { event_id },
         include: [
@@ -236,6 +236,22 @@ exports.getPublicRekapByEvent = async (req, res) => {
         group: ["Penilaian.team_id", "AspekNilais.aspek_id"],
         raw: true,
       }),
+      // Mengambil daftar donasi dari balance Event_teams
+      Event_teams.findAll({
+        where: { event_id },
+        include: [
+          {
+            model: Teams,
+            attributes: [
+              "team_id",
+              "team_name",
+              "team_sekolah_instansi",
+              "team_logo",
+            ],
+          },
+        ],
+        order: [["balance", "DESC"]],
+      }),
     ]);
 
     // 3. Proses dan gabungkan data
@@ -247,7 +263,7 @@ exports.getPublicRekapByEvent = async (req, res) => {
       const aspekName = aspekIdToNameMap.get(score.aspek_id);
       if (aspekName) {
         scoresByTeam.get(score.team_id)[aspekName] = parseFloat(
-          score.avg_score
+          score.avg_score,
         );
       }
     });
@@ -258,7 +274,12 @@ exports.getPublicRekapByEvent = async (req, res) => {
       scores: scoresByTeam.get(item.team_id) || {},
     }));
 
-    res.status(200).json({ event, rekap: finalRekap, aspeks: aspekHeaders });
+    res.status(200).json({
+      event,
+      rekap: finalRekap,
+      aspeks: aspekHeaders,
+      donasi: donationList, // Kirim klasemen donasi
+    });
   } catch (error) {
     console.error("Error fetching public rekap:", error);
     res.status(500).json({ message: "Internal server error" });

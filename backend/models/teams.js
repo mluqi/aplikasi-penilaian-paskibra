@@ -17,6 +17,7 @@ module.exports = (sequelize, DataTypes) => {
       Teams.hasMany(models.Penilaian, { foreignKey: "team_id" });
       Teams.hasMany(models.Event_teams, { foreignKey: "team_id" });
       Teams.hasMany(models.RekapNilai, { foreignKey: "team_id" });
+      Teams.hasMany(models.Donations, { foreignKey: "team_id" });
     }
   }
   Teams.init(
@@ -44,7 +45,7 @@ module.exports = (sequelize, DataTypes) => {
       sequelize,
       modelName: "Teams",
       tableName: "Teams",
-    }
+    },
   );
   return Teams;
 };

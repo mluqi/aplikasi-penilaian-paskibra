@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import api from "@/service/api";
 import { toast } from "sonner";
 import Image from "next/image";
+import Link from "next/link";
 import { format } from "date-fns";
 import { id } from "date-fns/locale";
 import {
@@ -39,6 +40,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -56,6 +59,11 @@ import {
   CalendarIcon,
   Check,
   X,
+  Trophy,
+  Users,
+  Building2,
+  UserCircle,
+  MapPin,
 } from "lucide-react";
 import {
   Breadcrumb,
@@ -131,7 +139,7 @@ const AnggotaForm = ({ anggota, onSave, onCancel }) => {
               variant={"outline"}
               className={cn(
                 "col-span-3 justify-start text-left font-normal",
-                !formData.anggota_tanggal_lahir && "text-muted-foreground"
+                !formData.anggota_tanggal_lahir && "text-muted-foreground",
               )}
             >
               <CalendarIcon className="mr-2 h-4 w-4" />
@@ -220,7 +228,7 @@ export default function TeamDetailPage() {
       if (selectedAnggota) {
         const response = await api.put(
           `/anggota/${selectedAnggota.anggota_id}`,
-          anggotaData
+          anggotaData,
         );
         toast.success(response.data.message || "Anggota berhasil diperbarui.");
       } else {
@@ -238,7 +246,7 @@ export default function TeamDetailPage() {
     if (!selectedAnggota) return;
     try {
       const response = await api.delete(
-        `/anggota/${selectedAnggota.anggota_id}`
+        `/anggota/${selectedAnggota.anggota_id}`,
       );
       toast.success(response.data.message || "Anggota berhasil dihapus.");
       fetchData();
@@ -281,11 +289,15 @@ export default function TeamDetailPage() {
           <Breadcrumb>
             <BreadcrumbList>
               <BreadcrumbItem>
-                <BreadcrumbLink href="/dashboard">Dashboard</BreadcrumbLink>
+                <BreadcrumbLink href="/admin/dashboard">
+                  Dashboard
+                </BreadcrumbLink>
               </BreadcrumbItem>
               <BreadcrumbSeparator />
               <BreadcrumbItem>
-                <BreadcrumbLink href="/teams">Manajemen Tim</BreadcrumbLink>
+                <BreadcrumbLink href="/admin/teams">
+                  Manajemen Tim
+                </BreadcrumbLink>
               </BreadcrumbItem>
               <BreadcrumbSeparator />
               <BreadcrumbItem>
@@ -297,102 +309,225 @@ export default function TeamDetailPage() {
       </header>
 
       <main className="flex flex-1 flex-col gap-4 p-4 pt-0">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Image
-              src={
-                team.team_logo
-                  ? `${process.env.NEXT_PUBLIC_API_URL}${team.team_logo}`
-                  : "/default-logo.png"
-              }
-              alt={`Logo ${team.team_name}`}
-              width={64}
-              height={64}
-              className="rounded-lg border object-contain p-1"
-            />
-            <div>
-              <h1 className="text-2xl font-semibold">{team.team_name}</h1>
-              <p className="text-muted-foreground">
-                {team.team_sekolah_instansi}
-              </p>
+        {/* Team Profile Header Card */}
+        <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-800 p-5 md:p-6 mb-4">
+          <div className="flex flex-col md:flex-row gap-6 items-start md:items-center">
+            <div className="w-24 h-24 md:w-28 md:h-28 shrink-0 bg-white rounded-2xl border shadow-sm flex items-center justify-center p-2 overflow-hidden mx-auto md:mx-0">
+              <Image
+                src={
+                  team.team_logo
+                    ? `${process.env.NEXT_PUBLIC_API_URL}${team.team_logo}`
+                    : "/default-logo.png"
+                }
+                alt={`Logo ${team.team_name}`}
+                width={112}
+                height={112}
+                className="object-contain w-full h-full"
+              />
+            </div>
+            <div className="flex-1 w-full text-center md:text-left">
+              <h1 className="text-2xl md:text-3xl font-bold tracking-tight mb-2 text-gray-900 dark:text-white">
+                {team.team_name}
+              </h1>
+              <div className="flex items-center justify-center md:justify-start gap-2 text-muted-foreground mb-4">
+                <Building2 className="w-4 h-4 text-primary" />
+                <span className="text-sm font-medium">
+                  {team.team_sekolah_instansi}
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center justify-center md:justify-start gap-3">
+                <Badge
+                  variant="secondary"
+                  className="bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 border-emerald-200/50"
+                >
+                  <Users className="w-3.5 h-3.5 mr-1.5" /> {anggota.length} /{" "}
+                  {team.team_jumlah_anggota} Anggota
+                </Badge>
+                <Badge variant="outline" className="shadow-sm">
+                  <UserCircle className="w-3.5 h-3.5 mr-1.5 text-muted-foreground" />
+                  Koordinator: {team.User?.user_name || "-"}
+                </Badge>
+              </div>
+            </div>
+            <div className="w-full md:w-auto mt-2 md:mt-0">
+              <Button
+                onClick={() => openDialog()}
+                disabled={isTeamFull}
+                className="w-full md:w-auto shadow-sm"
+              >
+                <PlusCircle className="mr-2 h-4 w-4" />
+                Tambah Anggota
+              </Button>
             </div>
           </div>
-          <Button onClick={() => openDialog()} disabled={isTeamFull}>
-            <PlusCircle className="mr-2 h-4 w-4" />
-            Tambah Anggota
-          </Button>
         </div>
 
-        <div className="rounded-lg border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>ID Anggota</TableHead>
-                <TableHead>Nama Anggota</TableHead>
-                <TableHead>Tempat, Tanggal Lahir</TableHead>
-                <TableHead className="text-center">Danton</TableHead>
-                <TableHead className="text-right">Aksi</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {anggota.length > 0 ? (
-                anggota.map((item) => (
-                  <TableRow key={item.anggota_id}>
-                    <TableCell className="font-mono text-xs">
-                      {item.anggota_id}
-                    </TableCell>
-                    <TableCell className="font-medium">
-                      {item.anggota_nama}
-                    </TableCell>
-                    <TableCell>
-                      {item.anggota_tempat_lahir},{" "}
-                      {format(
-                        new Date(item.anggota_tanggal_lahir),
-                        "d MMMM yyyy",
-                        { locale: id }
-                      )}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {item.anggota_is_danton ? (
-                        <Check className="mx-auto h-5 w-5 text-green-500" />
-                      ) : (
-                        <X className="mx-auto h-5 w-5 text-muted-foreground" />
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => openDialog(item)}>
-                            <Edit className="mr-2 h-4 w-4" />
-                            <span>Edit</span>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-red-600"
-                            onClick={() => openAlert(item)}
-                          >
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            <span>Hapus</span>
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+        <Card className="shadow-sm border-border/50 overflow-hidden mb-6">
+          <CardHeader className="flex flex-row items-center justify-between bg-muted/20 border-b pb-4 pt-5">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <div className="p-2 bg-emerald-500/10 rounded-lg">
+                <Users className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+              </div>
+              Daftar Anggota
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader className="bg-muted/50">
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="w-[120px]">ID Anggota</TableHead>
+                  <TableHead>Nama Lengkap</TableHead>
+                  <TableHead>Tempat, Tanggal Lahir</TableHead>
+                  <TableHead>Posisi</TableHead>
+                  <TableHead className="text-right">Aksi</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {anggota.length > 0 ? (
+                  anggota.map((item) => (
+                    <TableRow
+                      key={item.anggota_id}
+                      className="hover:bg-muted/40 transition-colors"
+                    >
+                      <TableCell>
+                        <Badge
+                          variant="secondary"
+                          className="font-mono text-[10px] tracking-wider text-muted-foreground"
+                        >
+                          {item.anggota_id}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="font-bold text-foreground">
+                        {item.anggota_nama}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        <div className="flex items-center gap-1.5">
+                          <MapPin className="h-3.5 w-3.5 shrink-0 opacity-70" />
+                          {item.anggota_tempat_lahir},{" "}
+                          {format(
+                            new Date(item.anggota_tanggal_lahir),
+                            "d MMM yyyy",
+                            { locale: id },
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {item.anggota_is_danton ? (
+                          <Badge className="bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 border-emerald-200/50 shadow-none">
+                            <Check className="h-3 w-3 mr-1" /> Danton
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground text-sm flex items-center gap-1">
+                            Anggota
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" className="h-8 w-8 p-0">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => openDialog(item)}>
+                              <Edit className="mr-2 h-4 w-4" />
+                              <span>Edit</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="text-red-600"
+                              onClick={() => openAlert(item)}
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              <span>Hapus</span>
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell
+                      colSpan={5}
+                      className="h-24 text-center text-muted-foreground"
+                    >
+                      Belum ada anggota di tim ini.
                     </TableCell>
                   </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell colSpan="5" className="h-24 text-center">
-                    Belum ada anggota di tim ini.
-                  </TableCell>
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-sm border-border/50 overflow-hidden mb-8">
+          <CardHeader className="flex flex-row items-center justify-between bg-muted/20 border-b pb-4 pt-5">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <div className="p-2 bg-amber-500/10 rounded-lg">
+                <Trophy className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+              </div>
+              Event yang Diikuti & Donasi
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader className="bg-muted/50">
+                <TableRow className="hover:bg-transparent">
+                  <TableHead>Detail Event</TableHead>
+                  <TableHead className="text-right">
+                    Total Donasi Terkumpul
+                  </TableHead>
                 </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </div>
+              </TableHeader>
+              <TableBody>
+                {team.Event_teams && team.Event_teams.length > 0 ? (
+                  team.Event_teams.map((et) => (
+                    <TableRow
+                      key={et.event_id}
+                      className="hover:bg-muted/40 transition-colors"
+                    >
+                      <TableCell>
+                        <div className="flex flex-col gap-1.5">
+                          <Link
+                            href={`/admin/teams/${team.team_id}/events/${et.event_id}`}
+                            className="font-bold text-foreground hover:text-primary transition-colors text-base"
+                          >
+                            {et.Event?.event_name}
+                          </Link>
+                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <CalendarIcon className="h-3.5 w-3.5 shrink-0 opacity-70" />
+                            {et.Event?.event_tanggal
+                              ? format(
+                                  new Date(et.Event.event_tanggal),
+                                  "d MMM yyyy",
+                                  { locale: id },
+                                )
+                              : "-"}
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="inline-flex items-center justify-end font-bold text-base text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 px-3 py-1.5 rounded-lg border border-emerald-200/50 shadow-sm">
+                          Rp {(Number(et.balance) || 0).toLocaleString("id-ID")}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell
+                      colSpan={2}
+                      className="h-24 text-center text-muted-foreground"
+                    >
+                      Tim ini belum mengikuti event apapun.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
       </main>
 
       <Dialog

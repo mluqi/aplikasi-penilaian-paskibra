@@ -4,23 +4,30 @@ const {
   Teams,
   Event_juri,
   Event_teams,
+  Donations,
+  Aspeks,
   sequelize,
 } = require("../models");
 const { Op } = require("sequelize");
 const fs = require("fs");
 const { logAktivitas } = require("../services/logService");
 const path = require("path");
+const {
+  createXenPlatformAccount,
+  createQrCode,
+  getBalance,
+} = require("../services/xenPlatformService");
 
-// Helper untuk menghapus poster lama
-const deleteOldPoster = (posterPath) => {
-  if (posterPath) {
-    const relativePath = posterPath.startsWith("/")
-      ? posterPath.substring(1)
-      : posterPath;
+// Helper untuk menghapus file lama
+const deleteOldFile = (filePath) => {
+  if (filePath) {
+    const relativePath = filePath.startsWith("/")
+      ? filePath.substring(1)
+      : filePath;
     const absolutePath = path.join(__dirname, "..", relativePath);
     if (fs.existsSync(absolutePath)) {
       fs.unlink(absolutePath, (err) => {
-        if (err) console.error("Gagal menghapus poster lama:", err);
+        if (err) console.error("Gagal menghapus file lama:", err);
       });
     }
   }
@@ -41,7 +48,12 @@ exports.createEvent = async (req, res) => {
     event_tingkat,
     event_provinsi,
     event_kota,
+    event_penyelenggara,
+    event_contact_person_name,
+    event_contact_person_number,
+    event_batas_pendaftaran,
     koordinator_id,
+    event_kuota,
   } = req.body;
 
   try {
@@ -60,8 +72,14 @@ exports.createEvent = async (req, res) => {
     }
 
     let event_poster = null;
-    if (req.file) {
-      event_poster = `/uploads/events/${req.file.filename}`;
+    let event_juknis = null;
+    if (req.files) {
+      if (req.files.event_poster) {
+        event_poster = `/uploads/events/${req.files.event_poster[0].filename}`;
+      }
+      if (req.files.event_juknis) {
+        event_juknis = `/uploads/events/${req.files.event_juknis[0].filename}`;
+      }
     }
 
     let executedQuery;
@@ -72,6 +90,7 @@ exports.createEvent = async (req, res) => {
       event_tempat,
       event_waktu,
       event_poster,
+      event_juknis,
       event_biaya_pendaftaran,
       event_deskripsi,
       event_status,
@@ -79,12 +98,17 @@ exports.createEvent = async (req, res) => {
       event_tingkat,
       event_provinsi,
       event_kota,
+      event_batas_pendaftaran,
+      event_contact_person_name,
+      event_contact_person_number,
+      event_penyelenggara,
       koordinator_id: finalKoordinatorId,
+      event_kuota: event_kuota ? parseInt(event_kuota) : null,
     };
     const newEvent = await Events.create(
       createData,
       // Tangkap query yang dieksekusi
-      { logging: (sql) => (executedQuery = sql) }
+      { logging: (sql) => (executedQuery = sql) },
     );
 
     // Log aktivitas
@@ -180,7 +204,7 @@ exports.getEventById = async (req, res) => {
         },
         {
           model: Event_teams,
-          include: [{ model: Teams, attributes: ["team_id", "team_name"] }],
+          include: [{ model: Teams, attributes: ["team_id", "team_name", "team_logo"] }],
         },
       ],
     });
@@ -205,13 +229,21 @@ exports.updateEvent = async (req, res) => {
     }
 
     let event_poster = event.event_poster;
-    if (req.file) {
-      deleteOldPoster(event.event_poster);
-      event_poster = `/uploads/events/${req.file.filename}`;
+    let event_juknis = event.event_juknis;
+
+    if (req.files) {
+      if (req.files.event_poster) {
+        deleteOldFile(event.event_poster);
+        event_poster = `/uploads/events/${req.files.event_poster[0].filename}`;
+      }
+      if (req.files.event_juknis) {
+        deleteOldFile(event.event_juknis);
+        event_juknis = `/uploads/events/${req.files.event_juknis[0].filename}`;
+      }
     }
 
     let executedQuery;
-    const updateData = { ...req.body, event_poster };
+    const updateData = { ...req.body, event_poster, event_juknis };
     const updatedEvent = await event.update(updateData, {
       logging: (sql) => (executedQuery = sql),
     });
@@ -251,7 +283,8 @@ exports.deleteEvent = async (req, res) => {
     }
 
     let executedQuery;
-    deleteOldPoster(event.event_poster);
+    deleteOldFile(event.event_poster);
+    deleteOldFile(event.event_juknis);
     // onDelete: 'CASCADE' akan menghapus relasi di Event_juri dan Event_teams
     await event.destroy({ logging: (sql) => (executedQuery = sql) });
 
@@ -282,7 +315,7 @@ exports.deleteEvent = async (req, res) => {
 // Menambahkan Juri ke Event
 exports.addJuriToEvent = async (req, res) => {
   try {
-    const { event_id, juri_id } = req.body;
+    const { event_id, juri_id, peran_juri } = req.body;
     const event = await Events.findByPk(event_id);
     const juri = await Users.findOne({
       where: { user_id: juri_id, user_role: "juri" },
@@ -296,8 +329,8 @@ exports.addJuriToEvent = async (req, res) => {
 
     let executedQuery;
     await Event_juri.create(
-      { event_id, juri_id },
-      { logging: (sql) => (executedQuery = sql) }
+      { event_id, juri_id, peran_juri: peran_juri || "Juri Penilai" },
+      { logging: (sql) => (executedQuery = sql) },
     );
     logAktivitas({
       target: event_id,
@@ -401,13 +434,34 @@ exports.addTeamToEvent = async (req, res) => {
         .json({ message: "Event atau Tim tidak ditemukan." });
     }
 
-    // Perbaikan: Model Event_teams memiliki kolom juri_id, seharusnya team_id.
-    // Saya akan mengasumsikan modelnya benar dan kolomnya adalah team_id.
-    // Jika nama kolomnya `juri_id` di model `Event_teams`, ini perlu diperbaiki di model.
+    // Validasi batas pendaftaran
+    if (event.event_batas_pendaftaran) {
+      const now = new Date();
+      const batasPendaftaran = new Date(event.event_batas_pendaftaran);
+      if (now > batasPendaftaran) {
+        return res.status(400).json({
+          message: "Batas waktu pendaftaran untuk event ini telah berakhir.",
+        });
+      }
+    }
+
+    // Validasi kuota pendaftaran tim
+    if (event.event_kuota !== null && event.event_kuota > 0) {
+      const currentTeamCount = await Event_teams.count({
+        where: { event_id },
+      });
+
+      if (currentTeamCount >= event.event_kuota) {
+        return res
+          .status(400)
+          .json({ message: "Kuota pendaftaran untuk event ini sudah penuh." });
+      }
+    }
+
     let executedQuery;
     await Event_teams.create(
-      { event_id, team_id },
-      { logging: (sql) => (executedQuery = sql) }
+      { event_id, team_id, balance: 0 },
+      { logging: (sql) => (executedQuery = sql) },
     );
     logAktivitas({
       target: event_id,
@@ -436,13 +490,80 @@ exports.addTeamToEvent = async (req, res) => {
   }
 };
 
+// Buat Akun XenPlatform untuk Tim
+exports.createXenPlatformAccountForTeam = async (req, res) => {
+  try {
+    const { event_id, team_id } = req.body;
+
+    const eventTeam = await Event_teams.findOne({
+      where: { event_id, team_id },
+    });
+
+    if (!eventTeam) {
+      return res
+        .status(404)
+        .json({ message: "Tim tidak terdaftar pada event ini." });
+    }
+
+    if (eventTeam.xenplatform_id) {
+      return res
+        .status(400)
+        .json({ message: "Akun sudah pernah dibuat untuk tim ini." });
+    }
+
+    const event = await Events.findByPk(event_id);
+    const team = await Teams.findByPk(team_id, {
+      include: [{ model: Users, as: "User" }],
+    });
+
+    const email = team.User?.user_email || "default@palindo.id";
+    // XenPlatform API mensyaratkan business_name hanya berisi karakter alfanumerik
+    const businessName = `${team.team_name} ${event.event_name}`
+      .replace(/[^a-zA-Z0-9 ]/g, "") // Hapus karakter selain huruf, angka, dan spasi
+      .replace(/\s+/g, " ") // Rapikan spasi ganda menjadi spasi tunggal
+      .trim()
+      .substring(0, 255);
+
+    // 1. Buat Sub-akun di XenPlatform
+    const accountResponse = await createXenPlatformAccount(email, businessName);
+    const xenplatform_id = accountResponse.id;
+    const xenplatform_data = JSON.stringify(accountResponse); // Simpan seluruh respon
+
+    let executedQuery;
+    await eventTeam.update(
+      { xenplatform_id, xenplatform_data },
+      { logging: (sql) => (executedQuery = sql) },
+    );
+
+    logAktivitas({
+      target: event_id,
+      action: "CREATE_XEN_ACCOUNT",
+      detail: `SUCCESS - Team ID: ${team_id}, XenPlatform ID: ${xenplatform_id}`,
+      query: executedQuery,
+      data: { event_id, team_id, xenplatform_id },
+      owner: req.user.id,
+    });
+
+    res.status(200).json({
+      message: "Akun XenPlatform berhasil dibuat.",
+      data: eventTeam,
+    });
+  } catch (error) {
+    console.error("XenPlatform Error:", error);
+    res.status(500).json({
+      message: "Gagal membuat akun XenPlatform untuk tim ini.",
+      error: error.message,
+    });
+  }
+};
+
 // Menghapus Tim dari Event
 exports.removeTeamFromEvent = async (req, res) => {
   try {
     const { event_id, team_id } = req.body;
     let executedQuery;
     const result = await Event_teams.destroy({
-        where: { event_id, team_id },
+      where: { event_id, team_id },
       logging: (sql) => (executedQuery = sql),
     });
 
@@ -482,6 +603,7 @@ exports.getPublicEvents = async (req, res) => {
       tingkat,
       provinsi,
       kota,
+      biaya,
       search,
       page = 1,
       limit = 9,
@@ -493,6 +615,9 @@ exports.getPublicEvents = async (req, res) => {
 
     if (kategori) whereClause.event_kategori = kategori;
     if (tingkat) whereClause.event_tingkat = tingkat;
+    if (biaya === "gratis") whereClause.event_biaya_pendaftaran = 0;
+    if (biaya === "berbayar")
+      whereClause.event_biaya_pendaftaran = { [Op.gt]: 0 };
     if (provinsi) whereClause.event_provinsi = { [Op.like]: `%${provinsi}%` };
     if (kota) whereClause.event_kota = { [Op.like]: `%${kota}%` };
     if (search) {
@@ -529,6 +654,27 @@ exports.getPublicEventById = async (req, res) => {
         event_id: id,
         event_status: "published",
       },
+      include: [
+        {
+          model: Event_teams,
+          include: [
+            {
+              model: Teams,
+              attributes: ["team_id", "team_name", "team_sekolah_instansi"],
+            },
+          ],
+          attributes: ["team_id", "xenplatform_id"], // Diperlukan untuk filter tim yang bisa didonasi
+        },
+        {
+          model: Event_juri,
+          include: [{ model: Users, attributes: ["user_name", "user_photo"] }],
+        },
+        {
+          model: Aspeks,
+          attributes: ["nama_aspek", "bobot"],
+        },
+      ],
+      order: [[Aspeks, "urutan", "ASC"]],
     });
 
     if (!event) {
@@ -541,5 +687,81 @@ exports.getPublicEventById = async (req, res) => {
   } catch (error) {
     console.error("Gagal mengambil data detail event publik:", error);
     res.status(500).json({ message: "Terjadi kesalahan server." });
+  }
+};
+
+// Generate QRIS Dinamis untuk Donasi Publik
+exports.generatePublicQris = async (req, res) => {
+  try {
+    const { event_id, team_id, amount } = req.body;
+
+    const eventTeam = await Event_teams.findOne({
+      where: { event_id, team_id },
+    });
+    if (!eventTeam || !eventTeam.xenplatform_id) {
+      return res
+        .status(400)
+        .json({ message: "Tim ini belum mengaktifkan fitur donasi." });
+    }
+
+    const referenceId = `DON-${event_id}-${team_id}-${Date.now()}`;
+
+    // Generate QRIS bertipe DYNAMIC dengan amount tertentu
+    const qrResponse = await createQrCode(
+      referenceId,
+      eventTeam.xenplatform_id,
+      amount,
+    );
+
+    res.status(200).json({ qris: qrResponse });
+  } catch (error) {
+    console.error("Gagal generate public QRIS:", error);
+    res.status(500).json({ message: "Gagal membuat QRIS Donasi." });
+  }
+};
+
+// Sinkronisasi Saldo/Balance Manual dari XenPlatform
+exports.syncTeamBalance = async (req, res) => {
+  try {
+    const { event_id, team_id } = req.body;
+
+    const eventTeam = await Event_teams.findOne({
+      where: { event_id, team_id },
+    });
+
+    if (!eventTeam) {
+      return res
+        .status(404)
+        .json({ message: "Tim tidak terdaftar pada event ini." });
+    }
+
+    if (!eventTeam.xenplatform_id) {
+      return res
+        .status(400)
+        .json({ message: "Akun XenPlatform belum dibuat untuk tim ini." });
+    }
+
+    // Panggil API XenPlatform untuk mendapatkan saldo cash
+    const balanceData = await getBalance(eventTeam.xenplatform_id);
+    const newBalance = balanceData.balance || 0; // Xendit /balance endpoint mengembalikan objek berisi `balance`
+
+    await eventTeam.update({ balance: newBalance });
+
+    logAktivitas({
+      target: event_id,
+      action: "SYNC_BALANCE",
+      detail: `SUCCESS - Team ID: ${team_id}, New Balance: ${newBalance}`,
+      owner: req.user.id,
+    });
+
+    res
+      .status(200)
+      .json({ message: "Saldo berhasil disinkronisasi.", balance: newBalance });
+  } catch (error) {
+    console.error("Gagal sinkronisasi saldo:", error);
+    res.status(500).json({
+      message: "Gagal menyinkronkan saldo tim.",
+      error: error.message,
+    });
   }
 };

@@ -33,6 +33,7 @@ module.exports = (sequelize, DataTypes) => {
         onUpdate: "CASCADE",
         onDelete: "CASCADE",
       },
+      peran_juri: DataTypes.STRING,
     },
     {
       sequelize,

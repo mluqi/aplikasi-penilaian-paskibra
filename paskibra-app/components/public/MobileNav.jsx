@@ -1,67 +1,59 @@
 "use client";
 
 import Link from "next/link";
-import { Menu, X } from "lucide-react";
-import { Button } from "../ui/button";
-import { ThemeToggle } from "../layout/ThemeToggle";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
+import { usePathname } from "next/navigation";
+import { Home, CalendarDays, Info, PhoneCall } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const navLinks = [
-  { name: "Home", href: "/" },
-  { name: "Events", href: "/events" },
-  { name: "Tentang Kami", href: "/about" },
-  { name: "Kontak", href: "/contact" },
+  { name: "Home", href: "/", icon: Home },
+  { name: "Events", href: "/events", icon: CalendarDays },
+  { name: "Tentang", href: "/about", icon: Info },
+  { name: "Kontak", href: "/contact", icon: PhoneCall },
 ];
 
 const MobileNav = () => {
+  const pathname = usePathname();
+
   return (
-    <Sheet>
-      <SheetTrigger asChild>
-        <Button variant="ghost" size="icon">
-          <Menu className="h-6 w-6" />
-          <span className="sr-only">Buka menu</span>
-        </Button>
-      </SheetTrigger>
-      <SheetContent side="left" className="flex w-full flex-col">
-        <SheetHeader className="sr-only">
-          <SheetTitle>Menu Navigasi</SheetTitle>
-          <SheetDescription>
-            Daftar tautan untuk navigasi utama situs.
-          </SheetDescription>
-        </SheetHeader>
-        <nav className="flex flex-1 flex-col items-center justify-center gap-8">
-          <ul className="flex flex-col items-center gap-8">
-            {navLinks.map((link) => (
-              <li key={link.name}>
-                <SheetTrigger asChild>
-                  <Link
-                    href={link.href}
-                    className="text-2xl font-semibold text-foreground/80 transition-colors hover:text-foreground"
-                  >
-                    {link.name}
-                  </Link>
-                </SheetTrigger>
-              </li>
-            ))}
-          </ul>
-          <div className="mt-8 flex flex-col items-center gap-4">
-            <ThemeToggle />
-            <SheetTrigger asChild>
-              <Button asChild size="lg">
-                <Link href="/auth/login">Login</Link>
-              </Button>
-            </SheetTrigger>
-          </div>
-        </nav>
-      </SheetContent>
-    </Sheet>
+    <nav className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around bg-background/40 backdrop-blur-xl border-t border-border/40 pb-safe pt-2 px-2 md:hidden shadow-lg transition-all duration-300">
+      {navLinks.map((link) => {
+        const Icon = link.icon;
+        const isActive =
+          pathname === link.href ||
+          (link.href !== "/" && pathname?.startsWith(link.href));
+
+        return (
+          <Link
+            key={link.name}
+            href={link.href}
+            className={cn(
+              "flex flex-col items-center justify-center w-full py-2 gap-1 text-muted-foreground hover:text-foreground transition-colors",
+              isActive && "text-foreground",
+            )}
+          >
+            <div
+              className={cn(
+                "flex items-center justify-center w-12 h-8 rounded-full transition-all duration-300",
+                isActive
+                  ? "bg-foreground/10 shadow-sm backdrop-blur-md"
+                  : "bg-transparent hover:bg-foreground/5",
+              )}
+            >
+              <Icon className="h-5 w-5" />
+            </div>
+            <span
+              className={cn(
+                "text-[10px] transition-all",
+                isActive ? "font-bold" : "font-medium",
+              )}
+            >
+              {link.name}
+            </span>
+          </Link>
+        );
+      })}
+    </nav>
   );
 };
 

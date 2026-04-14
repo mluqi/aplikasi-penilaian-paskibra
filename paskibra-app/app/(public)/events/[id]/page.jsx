@@ -1,7 +1,20 @@
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Calendar, MapPin, Clock, DollarSign, ArrowLeft } from "lucide-react";
+import {
+  Calendar,
+  MapPin,
+  Clock,
+  ArrowLeft,
+  Building2,
+  Hourglass,
+  Phone,
+  Info,
+  Users,
+  Gavel,
+  ListChecks,
+  FileText,
+} from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import ShareButtons from "@/components/shared/ShareButtons";
@@ -25,8 +38,7 @@ const getKategoriLabel = (value) => {
 
 // Fungsi untuk mengambil data event berdasarkan ID
 async function getEventById(id) {
-  const apiUrl =
-    process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL;
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL;
   try {
     const response = await fetch(`${apiUrl}/api/events/public/${id}`, {
       cache: "no-store",
@@ -80,153 +92,525 @@ export default async function EventDetailPage({ params }) {
   const { id } = await params;
   const event = await getEventById(id);
 
-  // Jika event tidak ditemukan (baik karena ID salah atau status bukan 'published'), tampilkan 404
-  if (!event) {
-    notFound();
-  }
+  if (!event) notFound();
+
+  const posterUrl = event.event_poster
+    ? `${process.env.NEXT_PUBLIC_API_URL}${event.event_poster}`
+    : "/default-poster.png";
+
+  // Validasi apakah waktu saat ini sudah melewati batas pendaftaran
+  const isRegistrationClosed = event.event_batas_pendaftaran
+    ? new Date() > new Date(event.event_batas_pendaftaran)
+    : false;
+
+  // Validasi apakah kuota penuh
+  const isQuotaFull = event.event_kuota
+    ? event.Event_teams?.length >= event.event_kuota
+    : false;
+
+  // Validasi apakah event sudah dimulai (hari H atau setelahnya) untuk tombol klasemen
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const eventDate = new Date(event.event_tanggal);
+  eventDate.setHours(0, 0, 0, 0);
+  const isEventStarted = today >= eventDate;
 
   return (
-    <div className="flex flex-col min-h-screen bg-white dark:bg-gray-900">
+    <div className="flex flex-col min-h-screen bg-[#F8FAFC] dark:bg-gray-950 selection:bg-red-500/30">
       <main className="flex-grow">
-        {/* Banner Gambar */}
-        <section className="relative h-64 md:h-96 w-full">
+        {/* Banner */}
+        <section className="relative w-full h-[55vh] md:h-[65vh] lg:h-[75vh] overflow-hidden bg-gray-900 flex items-end">
           <Image
-            src={
-              event.event_poster
-                ? `${process.env.NEXT_PUBLIC_API_URL}${event.event_poster}`
-                : "/default-poster.png"
-            }
+            src={posterUrl}
             alt={`Poster ${event.event_name}`}
-            layout="fill"
-            objectFit="cover"
-            className="opacity-30"
+            fill
+            className="object-cover opacity-30 blur-xl scale-110"
             priority
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-white to-transparent dark:from-gray-900 to-transparent"></div>
+          <div className="absolute inset-0 bg-gradient-to-t from-[#F8FAFC] dark:from-gray-950 via-[#F8FAFC]/40 dark:via-gray-950/40 to-transparent" />
+
+          <div className="container relative z-10 mx-auto px-4 pb-10 md:pb-16 flex flex-col md:flex-row items-center md:items-end gap-6 md:gap-10">
+            {/* Poster Thumbnail for Desktop */}
+            <div className="hidden md:block relative w-64 h-[22rem] lg:w-80 lg:h-[28rem] rounded-3xl overflow-hidden shadow-2xl shadow-black/40 border-[6px] border-white/10 dark:border-white/5 flex-shrink-0 bg-gray-100 transform -rotate-2 hover:rotate-0 transition-transform duration-500">
+              <Image
+                src={posterUrl}
+                fill
+                className="object-cover bg-white"
+                alt="Poster Thumbnail"
+              />
+            </div>
+
+            {/* Title & Badges Overlay */}
+            <div className="text-white pb-2 lg:pb-6 text-center md:text-left w-full">
+              <div className="flex flex-wrap items-center justify-center md:justify-start gap-2.5 mb-5">
+                {event.event_kategori && (
+                  <Badge className="bg-white/20 hover:bg-white/30 text-white border-white/30 backdrop-blur-md px-3.5 py-1.5 text-xs font-medium rounded-full shadow-sm">
+                    {getKategoriLabel(event.event_kategori)}
+                  </Badge>
+                )}
+                {event.event_tingkat && (
+                  <Badge
+                    variant="outline"
+                    className="text-white border-white/30 bg-black/20 backdrop-blur-md px-3.5 py-1.5 text-xs font-medium rounded-full"
+                  >
+                    {capitalize(event.event_tingkat)}
+                  </Badge>
+                )}
+              </div>
+              <h1 className="text-4xl md:text-5xl lg:text-6xl font-black mb-4 drop-shadow-xl leading-tight tracking-tight text-gray-50">
+                {event.event_name}
+              </h1>
+              <p className="text-gray-200 text-base md:text-xl flex items-center justify-center md:justify-start gap-2.5 drop-shadow-md font-medium">
+                <MapPin className="h-5 w-5 text-red-400" /> {event.event_kota},{" "}
+                <span className="opacity-80">{event.event_provinsi}</span>
+              </p>
+            </div>
+          </div>
         </section>
 
-        {/* Konten Detail */}
-        <section className="container mx-auto px-4 -mt-24 md:-mt-32 pb-24">
-          <div className="relative max-w-4xl mx-auto bg-card p-6 sm:p-8 rounded-2xl shadow-lg border border-border/50">
-            <div className="flex flex-col md:flex-row gap-8">
-              {/* Poster Kecil */}
-              <div className="w-full md:w-1/3 flex-shrink-0">
+        {/* Content */}
+        <section className="container mx-auto px-4 py-10 md:py-16">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 xl:gap-12 items-start">
+            {/* LEFT COLUMN: Deskripsi & Tabel Peserta */}
+            <div className="lg:col-span-2 space-y-8 xl:space-y-10">
+              {/* Deskripsi Event */}
+              <div className="bg-white dark:bg-gray-900/60 backdrop-blur-xl rounded-3xl shadow-sm border border-gray-200/60 dark:border-gray-800/60 p-6 md:p-10">
+                <h2 className="text-2xl font-bold mb-6 flex items-center gap-3 text-gray-900 dark:text-white">
+                  <div className="p-2.5 bg-red-50 dark:bg-red-500/10 rounded-xl">
+                    <Info className="text-red-600 dark:text-red-400 h-6 w-6" />
+                  </div>
+                  Deskripsi Event
+                </h2>
+                <div className="prose dark:prose-invert max-w-none text-gray-600 dark:text-gray-400 leading-relaxed text-[15px] md:text-base">
+                  {event.event_deskripsi.split("\n").map((paragraph, index) =>
+                    paragraph.trim() ? (
+                      <p key={index} className="mb-5 text-justify">
+                        {paragraph}
+                      </p>
+                    ) : (
+                      <br key={index} />
+                    ),
+                  )}
+                </div>
+              </div>
+
+              {/* Kriteria Penilaian */}
+              {event.Aspeks && event.Aspeks.length > 0 && (
+                <div className="bg-white dark:bg-gray-900/60 backdrop-blur-xl rounded-3xl shadow-sm border border-gray-200/60 dark:border-gray-800/60 p-6 md:p-10">
+                  <h2 className="text-2xl font-bold mb-6 flex items-center gap-3 text-gray-900 dark:text-white">
+                    <div className="p-2.5 bg-orange-50 dark:bg-orange-500/10 rounded-xl">
+                      <ListChecks className="text-orange-600 dark:text-orange-400 h-6 w-6" />
+                    </div>
+                    Kriteria Penilaian
+                  </h2>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 lg:gap-6">
+                    {event.Aspeks.map((aspek, idx) => (
+                      <div
+                        key={idx}
+                        className="group flex justify-between items-center p-5 rounded-2xl bg-gray-50 dark:bg-gray-800/40 border border-gray-100 dark:border-gray-800 hover:border-orange-200 dark:hover:border-orange-900/50 transition-colors"
+                      >
+                        <span className="font-semibold text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white transition-colors">
+                          {aspek.nama_aspek}
+                        </span>
+                        <div className="flex items-center justify-center bg-white dark:bg-gray-900 shadow-sm border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-1.5 font-bold text-orange-600 dark:text-orange-400">
+                          {parseFloat(aspek.bobot)}%
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Dewan Juri */}
+              {event.Event_juris && event.Event_juris.length > 0 && (
+                <div className="bg-white dark:bg-gray-900/60 backdrop-blur-xl rounded-3xl shadow-sm border border-gray-200/60 dark:border-gray-800/60 p-6 md:p-10">
+                  <h2 className="text-2xl font-bold mb-6 flex items-center gap-3 text-gray-900 dark:text-white">
+                    <div className="p-2.5 bg-blue-50 dark:bg-blue-500/10 rounded-xl">
+                      <Gavel className="text-blue-600 dark:text-blue-400 h-6 w-6" />
+                    </div>
+                    Dewan Juri
+                  </h2>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 lg:gap-5">
+                    {event.Event_juris.map((juri, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center gap-4 p-4 rounded-2xl border border-gray-100 dark:border-gray-800/60 bg-gray-50/50 dark:bg-gray-800/20 hover:bg-white dark:hover:bg-gray-800 hover:shadow-md transition-all duration-300"
+                      >
+                        <div className="w-14 h-14 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 font-bold overflow-hidden shrink-0 shadow-inner">
+                          {juri.User?.user_photo ? (
+                            <Image
+                              src={`${process.env.NEXT_PUBLIC_API_URL}${juri.User.user_photo}`}
+                              alt={juri.User?.user_name}
+                              width={56}
+                              height={56}
+                              className="object-cover w-full h-full bg-white"
+                            />
+                          ) : (
+                            juri.User?.user_name?.charAt(0).toUpperCase() || "J"
+                          )}
+                        </div>
+                        <div>
+                          <p className="font-bold text-gray-900 dark:text-white line-clamp-1">
+                            {juri.User?.user_name}
+                          </p>
+                          <p className="text-sm font-medium text-blue-600/80 dark:text-blue-400/80 mt-0.5">
+                            {juri.peran_juri || "Juri Penilai"}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Juknis Section */}
+              {event.event_juknis && (
+                <div className="bg-gradient-to-br from-red-50 to-orange-50 dark:from-red-950/20 dark:to-orange-950/20 rounded-3xl shadow-sm border border-red-100 dark:border-red-900/30 p-6 md:p-10 relative overflow-hidden">
+                  {/* Decoration */}
+                  <div className="absolute -right-6 -top-6 text-red-500/5 dark:text-red-500/10">
+                    <FileText className="w-48 h-48" />
+                  </div>
+
+                  <div className="relative z-10">
+                    <h2 className="text-2xl font-bold mb-4 flex items-center gap-3 text-red-900 dark:text-red-100">
+                      <div className="p-2.5 bg-red-600 text-white rounded-xl shadow-md">
+                        <FileText className="h-6 w-6" />
+                      </div>
+                      Petunjuk Teknis (Juknis)
+                    </h2>
+                    <p className="text-red-800/80 dark:text-red-200/80 mb-6 leading-relaxed max-w-2xl">
+                      Unduh file petunjuk teknis pelaksanaan kompetisi ini untuk
+                      mengetahui detail persyaratan, aturan perlombaan, dan tata
+                      tertib acara secara lengkap.
+                    </p>
+                    <Button
+                      asChild
+                      className="bg-red-600 hover:bg-red-700 text-white rounded-xl px-8 h-12 text-base font-semibold shadow-lg shadow-red-600/20 transition-all hover:-translate-y-0.5"
+                    >
+                      <a
+                        href={`${process.env.NEXT_PUBLIC_API_URL}${event.event_juknis}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        Download File Juknis
+                      </a>
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Daftar Tim Peserta */}
+              <div className="bg-white dark:bg-gray-900/60 backdrop-blur-xl rounded-3xl shadow-sm border border-gray-200/60 dark:border-gray-800/60 p-6 md:p-10">
+                <h2 className="text-2xl font-bold mb-6 flex items-center gap-3 text-gray-900 dark:text-white">
+                  <div className="p-2.5 bg-emerald-50 dark:bg-emerald-500/10 rounded-xl">
+                    <Users className="text-emerald-600 dark:text-emerald-400 h-6 w-6" />
+                  </div>
+                  Daftar Tim Peserta
+                </h2>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm border-separate border-spacing-y-2">
+                    <thead className="text-gray-500 dark:text-gray-400 font-semibold">
+                      <tr className="bg-transparent">
+                        <th className="px-5 py-3 text-left">Nama Tim</th>
+                        <th className="px-5 py-3 text-left">
+                          Asal Sekolah/Instansi
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {event.Event_teams?.length > 0 ? (
+                        event.Event_teams.map((t) => (
+                          <tr
+                            key={t.team_id}
+                            className="bg-gray-50/80 dark:bg-gray-800/40 hover:bg-white dark:hover:bg-gray-800 hover:shadow-sm transition-all duration-200"
+                          >
+                            <td className="px-5 py-4 font-bold text-gray-900 dark:text-white rounded-l-2xl border-y border-l border-gray-100 dark:border-gray-800">
+                              {t.Team.team_name}
+                            </td>
+                            <td className="px-5 py-4 text-gray-600 dark:text-gray-400 rounded-r-2xl border-y border-r border-gray-100 dark:border-gray-800">
+                              {t.Team.team_sekolah_instansi}
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td
+                            colSpan="2"
+                            className="px-4 py-12 text-center text-gray-500 dark:text-gray-400 bg-gray-50/80 dark:bg-gray-800/40 rounded-2xl border border-dashed border-gray-200 dark:border-gray-700"
+                          >
+                            Belum ada tim peserta yang terdaftar.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            {/* RIGHT COLUMN: Sticky Sidebar Info & Actions */}
+            <div className="lg:col-span-1 space-y-6 lg:sticky lg:top-24">
+              {/* Mobile Poster (Hanya tampil di HP karena di desktop sudah ada thumbnail di banner) */}
+              <div className="md:hidden relative w-full aspect-[3/4] rounded-3xl overflow-hidden shadow-2xl shadow-black/20 border-4 border-white dark:border-gray-800 mb-8 mx-auto max-w-sm">
                 <Image
-                  src={
-                    event.event_poster
-                      ? `${process.env.NEXT_PUBLIC_API_URL}${event.event_poster}`
-                      : "/default-poster.png"
-                  }
-                  alt={`Poster ${event.event_name}`}
-                  width={400}
-                  height={600}
-                  className="rounded-lg shadow-md w-full"
+                  src={posterUrl}
+                  fill
+                  className="object-cover"
+                  alt="Poster"
                 />
               </div>
 
-              {/* Informasi Event */}
-              <div className="w-full md:w-2/3">
-                <div className="flex flex-wrap gap-2 mb-4">
-                  {event.event_kategori && (
-                    <Badge variant="destructive">
-                      {getKategoriLabel(event.event_kategori)}
-                    </Badge>
-                  )}
-                  {event.event_tingkat && (
-                    <Badge variant="secondary">
-                      {capitalize(event.event_tingkat)}
-                    </Badge>
-                  )}
+              {/* Main Action Card */}
+              <div className="bg-white dark:bg-gray-900 rounded-[2rem] shadow-xl shadow-gray-200/50 dark:shadow-none border border-gray-100 dark:border-gray-800 p-6 md:p-8">
+                <div className="mb-8 text-center">
+                  <p className="text-xs font-bold text-red-600 dark:text-red-400 uppercase tracking-widest mb-2">
+                    Biaya Pendaftaran
+                  </p>
+                  <p className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-br from-red-600 to-orange-500 dark:from-red-400 dark:to-orange-400 drop-shadow-sm">
+                    {event.event_biaya_pendaftaran === 0
+                      ? "Gratis"
+                      : new Intl.NumberFormat("id-ID", {
+                          style: "currency",
+                          currency: "IDR",
+                          maximumFractionDigits: 0,
+                        }).format(event.event_biaya_pendaftaran)}
+                  </p>
                 </div>
-                <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-2">
-                  {event.event_name}
-                </h1>
-                <p className="text-lg text-muted-foreground mb-6">
-                  {event.event_kota}, {event.event_provinsi}
-                </p>
-                <div className="space-y-3 text-muted-foreground mb-6">
-                  <div className="flex items-center gap-3">
-                    <Calendar className="h-5 w-5 text-primary" />
-                    <span>
-                      {new Date(event.event_tanggal).toLocaleDateString(
-                        "id-ID",
-                        {
-                          weekday: "long",
-                          year: "numeric",
-                          month: "long",
-                          day: "numeric",
-                        }
-                      )}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Clock className="h-5 w-5 text-primary" />
-                    <span>Pukul {event.event_waktu} WIB - Selesai</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <MapPin className="h-5 w-5 text-primary" />
-                    <span>{event.event_tempat}</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <DollarSign className="h-5 w-5 text-primary" />
-                    <span>
-                      Biaya Pendaftaran:{" "}
-                      {new Intl.NumberFormat("id-ID", {
-                        style: "currency",
-                        currency: "IDR",
-                      }).format(event.event_biaya_pendaftaran)}
-                    </span>
-                  </div>
-                </div>
-                <h3 className="text-xl font-semibold text-foreground mb-2">
-                  Deskripsi Event
-                </h3>
-                <p className="text-muted-foreground leading-relaxed mb-8">
-                  {event.event_deskripsi}
-                </p>
-                <div className="flex flex-col gap-4">
-                  <div className="flex flex-col items-center justify-between gap-2 flex-grow sm:flex-row">
+
+                <div className="space-y-4 mb-8">
+                  {isRegistrationClosed ? (
+                    <Button
+                      size="lg"
+                      disabled
+                      className="w-full h-14 rounded-2xl bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500 shadow-none cursor-not-allowed font-bold"
+                    >
+                      Pendaftaran Ditutup
+                    </Button>
+                  ) : isQuotaFull ? (
+                    <Button
+                      size="lg"
+                      disabled
+                      className="w-full h-14 rounded-2xl bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500 shadow-none cursor-not-allowed font-bold"
+                    >
+                      Kuota Penuh
+                    </Button>
+                  ) : (
                     <Link
                       href="/auth/login"
                       className={buttonVariants({
                         size: "lg",
-                        className: "w-full sm:w-auto",
+                        className:
+                          "w-full h-14 rounded-2xl bg-gradient-to-r from-red-600 to-red-500 hover:from-red-700 hover:to-red-600 text-white font-bold text-base shadow-lg shadow-red-600/25 hover:shadow-xl hover:shadow-red-600/30 transition-all hover:-translate-y-0.5",
                       })}
                     >
                       Daftar Sekarang
                     </Link>
-                  </div>
-                  <div className="flex flex-row gap-2 items-center justify-between sm:flex-row">
-                    <Link
-                      href="/events"
-                      className={buttonVariants({
-                        size: "lg",
-                        variant: "outline",
-                        className: "w-full sm:w-auto",
-                      })}
-                    >
-                      <ArrowLeft className="mr-2 h-4 w-4" />
-                      Kembali ke Daftar Event
-                    </Link>
+                  )}
+
+                  {isEventStarted ? (
                     <Link
                       href={`/events/${event.event_id}/results`}
                       className={buttonVariants({
                         size: "lg",
                         variant: "outline",
-                        className: "w-full sm:w-auto",
+                        className:
+                          "w-full h-14 rounded-2xl border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900/50 dark:text-red-400 dark:hover:bg-red-900/20 font-bold transition-all",
                       })}
                     >
-                      Lihat Hasil Akhir
+                      Lihat Hasil Klasemen
                     </Link>
+                  ) : (
+                    <Button
+                      size="lg"
+                      variant="outline"
+                      disabled
+                      className="w-full h-14 rounded-2xl border-gray-200 text-gray-400 dark:border-gray-800 dark:text-gray-500 cursor-not-allowed shadow-none font-bold"
+                    >
+                      Hasil Klasemen Belum Tersedia
+                    </Button>
+                  )}
+                </div>
+
+                {/* Info List */}
+                <div className="space-y-5 text-[15px]">
+                  {/* Pelaksanaan */}
+                  <div className="flex gap-4">
+                    <div className="w-12 h-12 rounded-2xl bg-gray-50 dark:bg-gray-800 flex items-center justify-center text-gray-600 dark:text-gray-400 shrink-0 border border-gray-100 dark:border-gray-700">
+                      <Calendar className="w-5 h-5 text-red-500" />
+                    </div>
+                    <div className="pt-1">
+                      <p className="font-bold text-gray-900 dark:text-white mb-0.5 leading-none">
+                        Pelaksanaan
+                      </p>
+                      <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
+                        {new Date(event.event_tanggal).toLocaleDateString(
+                          "id-ID",
+                          {
+                            weekday: "long",
+                            year: "numeric",
+                            month: "long",
+                            day: "numeric",
+                          },
+                        )}
+                      </p>
+                      <p className="text-gray-500 dark:text-gray-400 text-sm flex items-center gap-1.5 mt-0.5">
+                        <Clock className="w-3.5 h-3.5 opacity-70" /> Pukul{" "}
+                        {event.event_waktu} WIB
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-4 pt-4 border-t border-border">
-                    <p className="text-sm font-semibold text-muted-foreground">
-                      Bagikan Event:
-                    </p>
-                    <ShareButtons title={event.event_name} />
+
+                  {/* Tempat */}
+                  <div className="flex gap-4">
+                    <div className="w-12 h-12 rounded-2xl bg-gray-50 dark:bg-gray-800 flex items-center justify-center text-gray-600 dark:text-gray-400 shrink-0 border border-gray-100 dark:border-gray-700">
+                      <MapPin className="w-5 h-5 text-orange-500" />
+                    </div>
+                    <div className="pt-1">
+                      <p className="font-bold text-gray-900 dark:text-white mb-0.5 leading-none">
+                        Lokasi
+                      </p>
+                      <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
+                        {event.event_tempat}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Penyelenggara */}
+                  {event.event_penyelenggara && (
+                    <div className="flex gap-4">
+                      <div className="w-12 h-12 rounded-2xl bg-gray-50 dark:bg-gray-800 flex items-center justify-center text-gray-600 dark:text-gray-400 shrink-0 border border-gray-100 dark:border-gray-700">
+                        <Building2 className="w-5 h-5 text-blue-500" />
+                      </div>
+                      <div className="pt-1">
+                        <p className="font-bold text-gray-900 dark:text-white mb-0.5 leading-none">
+                          Penyelenggara
+                        </p>
+                        <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
+                          {event.event_penyelenggara}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Batas Pendaftaran */}
+                  {event.event_batas_pendaftaran && (
+                    <div className="flex gap-4">
+                      <div className="w-12 h-12 rounded-2xl bg-gray-50 dark:bg-gray-800 flex items-center justify-center text-gray-600 dark:text-gray-400 shrink-0 border border-gray-100 dark:border-gray-700">
+                        <Hourglass className="w-5 h-5 text-purple-500" />
+                      </div>
+                      <div className="pt-1">
+                        <p className="font-bold text-gray-900 dark:text-white mb-0.5 leading-none">
+                          Batas Pendaftaran
+                        </p>
+                        <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
+                          {new Date(
+                            event.event_batas_pendaftaran,
+                          ).toLocaleDateString("id-ID", {
+                            year: "numeric",
+                            month: "long",
+                            day: "numeric",
+                          })}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Kontak */}
+                  {(event.event_contact_person_name ||
+                    event.event_contact_person_number) && (
+                    <div className="flex gap-4">
+                      <div className="w-12 h-12 rounded-2xl bg-gray-50 dark:bg-gray-800 flex items-center justify-center text-gray-600 dark:text-gray-400 shrink-0 border border-gray-100 dark:border-gray-700">
+                        <Phone className="w-5 h-5 text-emerald-500" />
+                      </div>
+                      <div className="pt-1">
+                        <p className="font-bold text-gray-900 dark:text-white mb-0.5 leading-none">
+                          Contact Person
+                        </p>
+                        <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
+                          {event.event_contact_person_name || "Panitia"}
+                        </p>
+                        {event.event_contact_person_number && (
+                          <a
+                            href={`https://wa.me/${event.event_contact_person_number.replace(/[^0-9]/g, "")}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 hover:underline font-semibold inline-flex mt-0.5 text-sm"
+                          >
+                            {event.event_contact_person_number}
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Kepesertaan / Kuota */}
+                  <div className="flex gap-4">
+                    <div className="w-12 h-12 rounded-2xl bg-gray-50 dark:bg-gray-800 flex items-center justify-center text-gray-600 dark:text-gray-400 shrink-0 border border-gray-100 dark:border-gray-700">
+                      <Users className="w-5 h-5 text-indigo-500" />
+                    </div>
+                    <div className="pt-1 w-full">
+                      <p className="font-bold text-gray-900 dark:text-white mb-0.5 leading-none flex items-center justify-between">
+                        Kepesertaan
+                        <span className="text-xs font-semibold bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-md text-gray-500">
+                          {event.event_kuota
+                            ? `${event.event_kuota} Max`
+                            : "Tanpa Batas"}
+                        </span>
+                      </p>
+
+                      <div className="mt-2.5">
+                        <div className="flex justify-between text-xs font-medium text-gray-500 mb-1">
+                          <span>
+                            {event.Event_teams?.length || 0} Terdaftar
+                          </span>
+                          {event.event_kuota && (
+                            <span>
+                              Sisa{" "}
+                              {Math.max(
+                                0,
+                                event.event_kuota -
+                                  (event.Event_teams?.length || 0),
+                              )}
+                            </span>
+                          )}
+                        </div>
+                        {event.event_kuota && (
+                          <div className="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-1.5 overflow-hidden">
+                            <div
+                              className="bg-indigo-500 h-1.5 rounded-full"
+                              style={{
+                                width: `${Math.min(100, ((event.Event_teams?.length || 0) / event.event_kuota) * 100)}%`,
+                              }}
+                            ></div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
+
+                <hr className="my-7 border-gray-100 dark:border-gray-800" />
+
+                {/* Share Section */}
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-bold text-gray-600 dark:text-gray-300">
+                    Bagikan Event:
+                  </span>
+                  <ShareButtons title={event.event_name} />
+                </div>
               </div>
+
+              {/* Back Button Desktop */}
+              <Link
+                href="/events"
+                className={buttonVariants({
+                  variant: "ghost",
+                  className:
+                    "w-full h-12 rounded-xl font-semibold text-gray-500 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800",
+                })}
+              >
+                <ArrowLeft className="mr-2 h-4 w-4" /> Kembali ke Daftar Event
+              </Link>
             </div>
           </div>
         </section>

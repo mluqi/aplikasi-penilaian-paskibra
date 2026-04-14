@@ -15,6 +15,7 @@ module.exports = (sequelize, DataTypes) => {
       Events.hasMany(models.Penilaian, { foreignKey: "event_id" });
       Events.hasMany(models.Aspeks, { foreignKey: "event_id" });
       Events.hasMany(models.RekapNilai, { foreignKey: "event_id" });
+      Events.hasMany(models.Donations, { foreignKey: "event_id" });
     }
   }
   Events.init(
@@ -32,9 +33,15 @@ module.exports = (sequelize, DataTypes) => {
       event_tempat: DataTypes.STRING,
       event_waktu: DataTypes.TIME,
       event_poster: DataTypes.TEXT,
+      event_juknis: DataTypes.TEXT,
       event_biaya_pendaftaran: DataTypes.BIGINT,
       event_deskripsi: DataTypes.TEXT,
       event_status: DataTypes.ENUM("draft", "published", "archived"),
+      event_batas_pendaftaran: DataTypes.DATE,
+      event_contact_person_name: DataTypes.STRING,
+      event_contact_person_number: DataTypes.STRING,
+      event_penyelenggara: DataTypes.STRING,
+      event_kuota: DataTypes.INTEGER,
       koordinator_id: {
         type: DataTypes.STRING,
         allowNull: false,
@@ -48,7 +55,7 @@ module.exports = (sequelize, DataTypes) => {
       sequelize,
       modelName: "Events",
       tableName: "Events",
-    }
+    },
   );
   return Events;
 };

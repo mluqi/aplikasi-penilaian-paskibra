@@ -39,17 +39,16 @@ export function AppSidebar({ ...props }) {
   if (isProcessingAuth) {
     return (
       <Sidebar {...props}>
-        <SidebarHeader>
-          <div className="h-8 w-3/4 rounded bg-gray-200 animate-pulse"></div>
+        <SidebarHeader className="p-4 border-b border-border/50">
+          <div className="flex items-center gap-3">
+            <div className="h-8 w-8 rounded-lg bg-muted animate-pulse"></div>
+            <div className="h-5 w-24 rounded bg-muted animate-pulse"></div>
+          </div>
         </SidebarHeader>
-        <SidebarContent>
-          <SidebarMenuSkeleton showIcon />
+        <SidebarContent className="p-4 gap-4">
           <SidebarMenuSkeleton showIcon />
           <SidebarMenuSkeleton showIcon />
         </SidebarContent>
-        <SidebarFooter>
-          <div className="h-12 rounded bg-gray-200 animate-pulse"></div>
-        </SidebarFooter>
       </Sidebar>
     );
   }
@@ -73,7 +72,7 @@ export function AppSidebar({ ...props }) {
           title: "Statistik",
           url: "/admin/statistics",
           icon: PieChart,
-          accessKey: "view_statistics", 
+          accessKey: "view_statistics",
           isActive: pathname.startsWith("/admin/statistics"),
         },
       ],
@@ -161,20 +160,27 @@ export function AppSidebar({ ...props }) {
 
   return (
     <Sidebar collapsible="icon" {...props}>
-      <SidebarHeader>
-        <h2 className="text-xl font-bold px-2 py-4 border-b border-b-gray-200 dark:border-b-gray-700 flex items-center gap-2">
-          <ShieldCheck className="h-6 w-6 text-red-600 group-data-[state=collapsed]:mx-auto" />
-          <span className="group-data-[state=collapsed]:hidden group-data-[state=collapsed]:opacity-0">
-            Paskibra App
-          </span>
-        </h2>
+      <SidebarHeader className="p-4 border-b border-border/50">
+        <div className="flex items-center gap-3 overflow-hidden">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-red-600 text-white shadow-sm transition-all group-data-[state=collapsed]:mx-auto group-data-[state=collapsed]:h-8 group-data-[state=collapsed]:w-8">
+            <ShieldCheck className="h-5 w-5" />
+          </div>
+          <div className="flex flex-col group-data-[state=collapsed]:hidden transition-opacity">
+            <span className="text-base font-bold tracking-tight leading-none text-foreground">
+              PaskibraApp
+            </span>
+            <span className="text-[10px] font-medium text-muted-foreground mt-1.5 uppercase tracking-widest leading-none">
+              Sistem Penilaian
+            </span>
+          </div>
+        </div>
       </SidebarHeader>
       <SidebarContent>
         {navGroups.map((group, index) => {
           const filteredItems = group.items.filter(
             (item) =>
               // Ganti logika dari 'roles' ke 'accessKey'
-              item.accessKey && user?.akses?.includes(item.accessKey)
+              item.accessKey && user?.akses?.includes(item.accessKey),
           );
           if (filteredItems.length === 0) return null;
 
@@ -184,9 +190,7 @@ export function AppSidebar({ ...props }) {
               className="group-data-[state=collapsed]:px-0 group-data-[state=collapsed]:py-0 "
             >
               {group.title && (
-                <SidebarGroupLabel className="text-sm font-medium text-gray-400 ">
-                  {group.title}
-                </SidebarGroupLabel>
+                <SidebarGroupLabel>{group.title}</SidebarGroupLabel>
               )}
               <NavMain items={filteredItems} />
             </SidebarGroup>

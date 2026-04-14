@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import api from "@/service/api";
 import { toast } from "sonner";
 import {
@@ -44,7 +44,18 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { MoreHorizontal, PlusCircle, Trash2, Edit, Users } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import {
+  MoreHorizontal,
+  PlusCircle,
+  Trash2,
+  Edit,
+  Users,
+  Building2,
+  X,
+  ImageIcon,
+  Info,
+} from "lucide-react";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -71,6 +82,8 @@ const TeamForm = ({ user, team, coordinators, onSave, onCancel }) => {
   const [logo, setLogo] = useState(null);
   const [logoPreview, setLogoPreview] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const logoInputRef = useRef(null);
 
   useEffect(() => {
     if (team?.team_logo) {
@@ -104,7 +117,7 @@ const TeamForm = ({ user, team, coordinators, onSave, onCancel }) => {
 
     if (!ALLOWED_TYPES.includes(file.type)) {
       toast.error(
-        "Tipe file tidak valid. Harap unggah file gambar (JPG, PNG, WEBP, SVG)."
+        "Tipe file tidak valid. Harap unggah file gambar (JPG, PNG, WEBP, SVG).",
       );
       e.target.value = "";
       return;
@@ -112,7 +125,7 @@ const TeamForm = ({ user, team, coordinators, onSave, onCancel }) => {
 
     if (file.size > MAX_SIZE) {
       toast.error(
-        `Ukuran file terlalu besar. Maksimal ${MAX_SIZE / 1024 / 1024}MB.`
+        `Ukuran file terlalu besar. Maksimal ${MAX_SIZE / 1024 / 1024}MB.`,
       );
       e.target.value = "";
       return;
@@ -123,6 +136,16 @@ const TeamForm = ({ user, team, coordinators, onSave, onCancel }) => {
     setLogoPreview(URL.createObjectURL(file));
   };
 
+  const handleRemoveLogo = () => {
+    setLogo(null);
+    if (team?.team_logo) {
+      setLogoPreview(`${process.env.NEXT_PUBLIC_API_URL}${team.team_logo}`);
+    } else {
+      setLogoPreview(null);
+    }
+    if (logoInputRef.current) logoInputRef.current.value = "";
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -131,104 +154,140 @@ const TeamForm = ({ user, team, coordinators, onSave, onCancel }) => {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="grid gap-4 py-4">
-      <div className="grid grid-cols-6 items-center gap-4">
-        <Label htmlFor="team_name" className="text-right col-span-2">
-          Nama Team
-        </Label>
-        <Input
-          id="team_name"
-          name="team_name"
-          value={formData.team_name}
-          onChange={handleChange}
-          className="col-span-4"
-          required
-        />
-      </div>
-      <div className="grid grid-cols-6 items-center gap-4">
-        <Label
-          htmlFor="team_sekolah_instansi"
-          className="text-right col-span-2"
-        >
-          Instansi
-        </Label>
-        <Input
-          id="team_sekolah_instansi"
-          name="team_sekolah_instansi"
-          value={formData.team_sekolah_instansi}
-          onChange={handleChange}
-          className="col-span-4"
-          required
-        />
-      </div>
-      <div className="grid grid-cols-6 items-center gap-4">
-        <Label htmlFor="team_jumlah_anggota" className="text-right col-span-2">
-          Jumlah Anggota
-        </Label>
-        <Input
-          id="team_jumlah_anggota"
-          name="team_jumlah_anggota"
-          type="number"
-          value={formData.team_jumlah_anggota}
-          onChange={handleChange}
-          className="col-span-4"
-          required
-          min="1"
-        />
-      </div>
-      {logoPreview && (
-        <div className="grid grid-cols-6 items-center gap-4">
-          <Label className="text-right col-span-2"></Label>
-          <div className="col-span-3">
-            <Image
-              src={logoPreview}
-              alt="Pratinjau Logo Team"
-              width={80}
-              height={80}
-              className="rounded-md border object-contain p-1"
-              onError={() => setLogoPreview(null)} // Sembunyikan jika URL rusak
+    <form onSubmit={handleSubmit} className="space-y-6 py-2 px-1">
+      {/* ── SEKSI 1: INFORMASI TIM ── */}
+      <div className="space-y-5 bg-muted/20 p-5 md:p-6 rounded-2xl border border-border/50">
+        <div className="flex items-center gap-2 border-b pb-3">
+          <Info className="w-5 h-5 text-primary" />
+          <h3 className="font-semibold text-lg text-foreground">
+            Informasi Tim
+          </h3>
+        </div>
+        <div className="grid md:grid-cols-2 gap-5">
+          <div className="space-y-2 md:col-span-2">
+            <Label htmlFor="team_name">
+              Nama Tim <span className="text-red-500">*</span>
+            </Label>
+            <Input
+              id="team_name"
+              name="team_name"
+              value={formData.team_name}
+              onChange={handleChange}
+              placeholder="Contoh: Pasukan Inti Garuda"
+              required
             />
           </div>
+          <div className="space-y-2 md:col-span-2">
+            <Label htmlFor="team_sekolah_instansi">
+              Asal Sekolah/Instansi <span className="text-red-500">*</span>
+            </Label>
+            <Input
+              id="team_sekolah_instansi"
+              name="team_sekolah_instansi"
+              value={formData.team_sekolah_instansi}
+              onChange={handleChange}
+              placeholder="Contoh: SMA Negeri 1 Bandung"
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="team_jumlah_anggota">
+              Jumlah Anggota <span className="text-red-500">*</span>
+            </Label>
+            <Input
+              id="team_jumlah_anggota"
+              name="team_jumlah_anggota"
+              type="number"
+              value={formData.team_jumlah_anggota}
+              onChange={handleChange}
+              min="1"
+              required
+            />
+          </div>
+          {(user?.role === "admin" || user?.role === "superadmin") && (
+            <div className="space-y-2">
+              <Label htmlFor="koordinator_id">
+                Koordinator <span className="text-red-500">*</span>
+              </Label>
+              <Select
+                value={formData.koordinator_id}
+                onValueChange={handleCoordinatorChange}
+                name="koordinator_id"
+                required
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Pilih Koordinator" />
+                </SelectTrigger>
+                <SelectContent>
+                  {coordinators.map((c) => (
+                    <SelectItem key={c.user_id} value={c.user_id}>
+                      {c.user_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </div>
-      )}
-      <div className="grid grid-cols-6 items-center gap-4">
-        <Label htmlFor="team_logo" className="text-right col-span-2">
-          Logo Team
-        </Label>
-        <Input
-          id="team_logo"
-          name="team_logo"
-          type="file"
-          onChange={handleLogoChange}
-          className="col-span-4"
-          accept="image/*"
-        />
       </div>
-      {user?.role === "admin" && (
-        <div className="grid grid-cols-4 items-center gap-4">
-          <Label htmlFor="koordinator_id" className="text-right">
-            Koordinator
-          </Label>
-          <Select
-            value={formData.koordinator_id}
-            onValueChange={handleCoordinatorChange}
-            name="koordinator_id"
-            required
-          >
-            <SelectTrigger className="col-span-3">
-              <SelectValue placeholder="Pilih Koordinator" />
-            </SelectTrigger>
-            <SelectContent>
-              {coordinators.map((c) => (
-                <SelectItem key={c.user_id} value={c.user_id}>
-                  {c.user_name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+
+      {/* ── SEKSI 2: LOGO TIM ── */}
+      <div className="space-y-5 bg-muted/20 p-5 md:p-6 rounded-2xl border border-border/50">
+        <div className="flex items-center gap-2 border-b pb-3">
+          <ImageIcon className="w-5 h-5 text-primary" />
+          <h3 className="font-semibold text-lg text-foreground">Logo Tim</h3>
         </div>
-      )}
-      <DialogFooter>
+        <div className="flex items-start gap-5">
+          {logoPreview ? (
+            <div className="relative w-20 h-20 rounded-2xl overflow-hidden border shadow-sm bg-white shrink-0">
+              <Image
+                src={logoPreview}
+                alt="Pratinjau Logo Team"
+                fill
+                className="object-contain p-2"
+                onError={() => setLogoPreview(null)}
+              />
+            </div>
+          ) : (
+            <div className="w-20 h-20 rounded-2xl border border-dashed flex items-center justify-center bg-muted/50 text-muted-foreground shrink-0">
+              <ImageIcon className="w-8 h-8 opacity-40" />
+            </div>
+          )}
+          <div className="flex-1 space-y-2 pt-1">
+            <Label htmlFor="team_logo" className="text-sm">
+              Unggah Logo (Opsional)
+            </Label>
+            <div className="flex items-center gap-2">
+              <Input
+                id="team_logo"
+                name="team_logo"
+                type="file"
+                onChange={handleLogoChange}
+                accept="image/*"
+                ref={logoInputRef}
+                className="flex-1"
+              />
+              {logo && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleRemoveLogo}
+                  title="Batal pilih logo"
+                >
+                  <X className="h-4 w-4 text-red-500" />
+                </Button>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Format yang didukung: JPG, PNG, WEBP, SVG. Maksimal ukuran file:
+              2MB.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <DialogFooter className="pt-4 border-t">
         <Button type="button" variant="outline" onClick={onCancel}>
           Batal
         </Button>
@@ -256,11 +315,11 @@ export default function TeamManagementPage() {
       const teamsRes = await api.get("/teams");
       setTeams(teamsRes.data.teams);
 
-      // Hanya ambil data semua user jika yang login adalah admin
-      if (user?.role === "admin") {
+      // Hanya ambil data semua user jika yang login adalah admin/superadmin
+      if (user?.role === "admin" || user?.role === "superadmin") {
         const usersRes = await api.get("/users");
         setCoordinators(
-          usersRes.data.filter((u) => u.user_role === "koordinator_team")
+          usersRes.data.filter((u) => u.user_role === "koordinator_team"),
         );
       }
     } catch (error) {
@@ -296,7 +355,7 @@ export default function TeamManagementPage() {
         const response = await api.put(
           `/teams/${selectedTeam.team_id}`,
           formData,
-          { headers: { "Content-Type": "multipart/form-data" } }
+          { headers: { "Content-Type": "multipart/form-data" } },
         );
         toast.success(response.data.message || "Team berhasil diperbarui.");
       } else {
@@ -367,58 +426,97 @@ export default function TeamManagementPage() {
           </Button>
         </div>
 
-        <div className="rounded-lg border">
+        <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
           <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[50px]">Logo</TableHead>
-                <TableHead>ID Team</TableHead>
-                <TableHead>Nama Team</TableHead>
-                <TableHead>Sekolah/Instansi</TableHead>
+            <TableHeader className="bg-muted/50">
+              <TableRow className="hover:bg-transparent">
+                <TableHead className="w-[300px]">Detail Tim</TableHead>
+                <TableHead>Asal Instansi</TableHead>
+                <TableHead>Kepesertaan</TableHead>
                 <TableHead>Koordinator</TableHead>
-                <TableHead className="text-center">Anggota</TableHead>
                 <TableHead className="text-right">Aksi</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan="7" className="h-24 text-center">
+                  <TableCell colSpan={5} className="h-24 text-center">
                     Memuat data...
                   </TableCell>
                 </TableRow>
               ) : teams.length > 0 ? (
                 teams.map((team) => (
-                  <TableRow key={team.team_id} className="hover:bg-muted/50">
+                  <TableRow
+                    key={team.team_id}
+                    className="hover:bg-muted/40 transition-colors group"
+                  >
                     <TableCell>
-                      <Image
-                        src={
-                          team.team_logo
-                            ? `${process.env.NEXT_PUBLIC_API_URL}${team.team_logo}`
-                            : "/default-logo.png"
-                        }
-                        alt={`Logo ${team.team_name}`}
-                        width={40}
-                        height={40}
-                        className="rounded-md border object-contain p-0.5"
-                        onError={(e) =>
-                          (e.currentTarget.src = "/default-logo.png")
-                        }
-                      />
+                      <div className="flex items-center gap-4">
+                        <div className="relative w-12 h-12 shrink-0 rounded-full overflow-hidden border shadow-sm bg-white flex items-center justify-center p-1">
+                          <Image
+                            src={
+                              team.team_logo
+                                ? `${process.env.NEXT_PUBLIC_API_URL}${team.team_logo}`
+                                : "/default-logo.png"
+                            }
+                            alt={`Logo ${team.team_name}`}
+                            width={40}
+                            height={40}
+                            className="object-contain"
+                            onError={(e) =>
+                              (e.currentTarget.src = "/default-logo.png")
+                            }
+                          />
+                        </div>
+                        <div className="flex flex-col min-w-0">
+                          <Link
+                            href={`/admin/teams/${team.team_id}`}
+                            className="font-bold text-sm md:text-base text-foreground hover:text-primary transition-colors truncate"
+                            title={team.team_name}
+                          >
+                            {team.team_name}
+                          </Link>
+                          <div className="flex items-center mt-1">
+                            <Badge
+                              variant="secondary"
+                              className="text-[10px] px-1.5 py-0 font-mono tracking-wider text-muted-foreground bg-muted/50 border-border/50"
+                            >
+                              {team.team_id}
+                            </Badge>
+                          </div>
+                        </div>
+                      </div>
                     </TableCell>
-                    <TableCell className="font-mono text-xs">
-                      {team.team_id}
+                    <TableCell>
+                      <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                        <Building2 className="h-4 w-4 shrink-0 opacity-70" />
+                        <span
+                          className="truncate max-w-[200px] sm:max-w-[250px]"
+                          title={team.team_sekolah_instansi}
+                        >
+                          {team.team_sekolah_instansi}
+                        </span>
+                      </div>
                     </TableCell>
-                    <TableCell className="font-medium hover:underline">
-                      <Link href={`/admin/teams/${team.team_id}`}>
-                        {team.team_name}
-                      </Link>
+                    <TableCell>
+                      <div className="inline-flex items-center gap-1.5 text-xs font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 px-2.5 py-1 rounded-md w-fit border border-emerald-200/50 dark:border-emerald-800/50 shadow-sm">
+                        <Users className="h-3.5 w-3.5" />
+                        {team.current_member_count || 0} /{" "}
+                        {team.team_jumlah_anggota} Anggota
+                      </div>
                     </TableCell>
-                    <TableCell>{team.team_sekolah_instansi}</TableCell>
-                    <TableCell>{team.User?.user_name || "-"}</TableCell>
-                    <TableCell className="text-center tabular-nums">
-                      {team.current_member_count || 0} /
-                      {team.team_jumlah_anggota}
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <div className="h-7 w-7 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold shrink-0">
+                          {team.User?.user_name?.charAt(0).toUpperCase() || "-"}
+                        </div>
+                        <span
+                          className="text-sm font-medium truncate max-w-[120px]"
+                          title={team.User?.user_name || "-"}
+                        >
+                          {team.User?.user_name || "-"}
+                        </span>
+                      </div>
                     </TableCell>
                     <TableCell className="text-right">
                       <DropdownMenu>
@@ -453,7 +551,7 @@ export default function TeamManagementPage() {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan="7" className="h-24 text-center">
+                  <TableCell colSpan={5} className="h-24 text-center">
                     Tidak ada data Team.
                   </TableCell>
                 </TableRow>
@@ -470,19 +568,21 @@ export default function TeamManagementPage() {
           setIsDialogOpen(open);
         }}
       >
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>
               {selectedTeam ? "Edit Team" : "Tambah Team Baru"}
             </DialogTitle>
           </DialogHeader>
-          <TeamForm
-            user={user}
-            team={selectedTeam}
-            coordinators={coordinators}
-            onSave={handleSaveTeam}
-            onCancel={() => setIsDialogOpen(false)}
-          />
+          <div className="flex-1 overflow-y-auto -mx-6 px-6 pb-2">
+            <TeamForm
+              user={user}
+              team={selectedTeam}
+              coordinators={coordinators}
+              onSave={handleSaveTeam}
+              onCancel={() => setIsDialogOpen(false)}
+            />
+          </div>
         </DialogContent>
       </Dialog>
 

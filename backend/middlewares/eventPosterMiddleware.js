@@ -14,22 +14,40 @@ const storage = multer.diskStorage({
   },
   filename: function (req, file, cb) {
     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    cb(null, "poster-" + uniqueSuffix + path.extname(file.originalname));
+    const prefix = file.fieldname === "event_juknis" ? "juknis-" : "poster-";
+    cb(null, prefix + uniqueSuffix + path.extname(file.originalname));
   },
 });
 
 const fileFilter = (req, file, cb) => {
-  if (file.mimetype.startsWith("image/")) {
-    cb(null, true);
+  if (file.fieldname === "event_poster") {
+    if (file.mimetype.startsWith("image/")) {
+      cb(null, true);
+    } else {
+      cb(new Error("Hanya file gambar yang diizinkan untuk poster!"), false);
+    }
+  } else if (file.fieldname === "event_juknis") {
+    if (
+      file.mimetype === "application/pdf" ||
+      file.mimetype.includes("word") ||
+      file.mimetype.includes("document")
+    ) {
+      cb(null, true);
+    } else {
+      cb(
+        new Error("Hanya file PDF atau Dokumen yang diizinkan untuk Juknis!"),
+        false,
+      );
+    }
   } else {
-    cb(new Error("Hanya file gambar yang diizinkan!"), false);
+    cb(null, true);
   }
 };
 
-const uploadEventPoster = multer({
+const uploadEventFiles = multer({
   storage,
   fileFilter,
-  limits: { fileSize: 1024 * 1024 * 5 },
-}); // Batas 5MB
+  limits: { fileSize: 1024 * 1024 * 10 }, // Diperbesar menjadi 10MB untuk juknis
+});
 
-module.exports = uploadEventPoster;
+module.exports = uploadEventFiles;

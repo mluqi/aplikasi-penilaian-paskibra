@@ -5,14 +5,6 @@ import useAuth from "@/hooks/useAuth";
 import api from "@/service/api";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import imageCompression from "browser-image-compression";
@@ -27,6 +19,15 @@ import {
 } from "@/components/ui/breadcrumb";
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
+import {
+  User,
+  Lock,
+  Mail,
+  Camera,
+  ShieldCheck,
+  Check,
+  Info,
+} from "lucide-react";
 
 export default function ProfileSettingsPage() {
   const { user, updateUserProfile } = useAuth();
@@ -58,7 +59,7 @@ export default function ProfileSettingsPage() {
 
     if (!ALLOWED_TYPES.includes(file.type)) {
       toast.error(
-        "Tipe file tidak valid. Harap unggah file JPG, PNG, atau WEBP."
+        "Tipe file tidak valid. Harap unggah file JPG, PNG, atau WEBP.",
       );
       e.target.value = "";
       return;
@@ -66,7 +67,7 @@ export default function ProfileSettingsPage() {
 
     if (file.size > MAX_SIZE) {
       toast.error(
-        `Ukuran file terlalu besar. Maksimal ${MAX_SIZE / 1024 / 1024}MB.`
+        `Ukuran file terlalu besar. Maksimal ${MAX_SIZE / 1024 / 1024}MB.`,
       );
       e.target.value = "";
       return;
@@ -84,7 +85,7 @@ export default function ProfileSettingsPage() {
         // Buat nama file baru dengan ekstensi .jpg
         const originalFilename = file.name.substring(
           0,
-          file.name.lastIndexOf(".")
+          file.name.lastIndexOf("."),
         );
         const newFilename = `${originalFilename}.jpg`;
 
@@ -191,68 +192,136 @@ export default function ProfileSettingsPage() {
         </div>
       </header>
 
-      <main className="flex flex-1 flex-col gap-6 p-4 pt-0">
-        <Card>
-          <CardHeader>
-            <CardTitle>Profil</CardTitle>
-            <CardDescription>
-              Perbarui informasi profil Anda. Email tidak dapat diubah.
-            </CardDescription>
-          </CardHeader>
-          <form onSubmit={handleProfileSubmit}>
-            <CardContent className="space-y-4">
-              <div className="flex items-center gap-4">
-                <Image
-                  src={preview || "/default-avatar.png"}
-                  alt="Foto Profil"
-                  width={80}
-                  height={80}
-                  className="rounded-full object-cover"
-                />
-                <div className="grid w-full max-w-sm items-center gap-1.5">
-                  <Label htmlFor="user_photo">Ubah Foto Profil</Label>
+      <main className="flex flex-1 flex-col gap-6 p-4 pt-0 max-w-4xl mx-auto w-full">
+        <div className="mb-2">
+          <h1 className="text-2xl font-bold tracking-tight">
+            Pengaturan Profil
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Kelola informasi data diri dan keamanan akun Anda.
+          </p>
+        </div>
+
+        <div className="space-y-6">
+          {/* Form Profil */}
+          <form
+            onSubmit={handleProfileSubmit}
+            className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-border/50 p-5 md:p-6 transition-all"
+          >
+            <div className="flex items-center gap-3 border-b pb-4 mb-6">
+              <div className="p-2 bg-primary/10 rounded-xl">
+                <User className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-lg text-foreground">
+                  Informasi Dasar
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  Perbarui foto profil dan nama lengkap Anda.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-col md:flex-row gap-8 items-start">
+              <div className="flex flex-col items-center gap-3 mx-auto md:mx-0 shrink-0">
+                <div className="relative w-32 h-32 rounded-full overflow-hidden border-4 border-muted shadow-sm bg-muted/50">
+                  <Image
+                    src={preview || "/default-avatar.png"}
+                    alt="Foto Profil"
+                    fill
+                    className="object-cover"
+                  />
+                </div>
+                <div className="relative w-full">
                   <Input
                     id="user_photo"
                     type="file"
                     onChange={handlePhotoChange}
                     accept="image/*"
-                    className="cursor-pointer "
+                    className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
+                    title="Ubah Foto"
                   />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                  >
+                    <Camera className="w-4 h-4 mr-2" /> Ubah Foto
+                  </Button>
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="name">Nama</Label>
-                <Input
-                  id="name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="space-y-2 mb-4">
-                <Label htmlFor="email">Email</Label>
-                <Input id="email" type="email" value={user.email} disabled />
-              </div>
-            </CardContent>
-            <CardFooter>
-              <Button type="submit" disabled={isProfileSubmitting}>
-                {isProfileSubmitting ? "Menyimpan..." : "Simpan Perubahan"}
-              </Button>
-            </CardFooter>
-          </form>
-        </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Ubah Password</CardTitle>
-            <CardDescription>
-              Masukkan password Anda saat ini untuk mengubahnya.
-            </CardDescription>
-          </CardHeader>
-          <form onSubmit={handlePasswordSubmit}>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="current_password">Password Saat Ini</Label>
+              <div className="flex-1 w-full space-y-5">
+                <div className="space-y-2">
+                  <Label htmlFor="name">
+                    Nama Lengkap <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    required
+                    className="max-w-md"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="email">Alamat Email</Label>
+                  <div className="relative max-w-md">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="email"
+                      type="email"
+                      value={user.email}
+                      disabled
+                      className="pl-9 bg-muted/50 text-muted-foreground font-medium"
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-1.5">
+                    <Info className="w-3.5 h-3.5 text-muted-foreground" /> Email
+                    digunakan untuk identitas login dan tidak dapat diubah.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-6 border-t mt-8">
+              <Button type="submit" disabled={isProfileSubmitting}>
+                {isProfileSubmitting ? (
+                  "Menyimpan..."
+                ) : (
+                  <>
+                    <Check className="w-4 h-4 mr-2" /> Simpan Perubahan
+                  </>
+                )}
+              </Button>
+            </div>
+          </form>
+
+          {/* Form Password */}
+          <form
+            onSubmit={handlePasswordSubmit}
+            className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-border/50 p-5 md:p-6 transition-all"
+          >
+            <div className="flex items-center gap-3 border-b pb-4 mb-6">
+              <div className="p-2 bg-amber-500/10 rounded-xl">
+                <Lock className="w-5 h-5 text-amber-600 dark:text-amber-500" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-lg text-foreground">
+                  Keamanan Akun
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  Ubah password Anda secara berkala untuk menjaga keamanan.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-6 max-w-2xl">
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="current_password">
+                  Password Saat Ini <span className="text-red-500">*</span>
+                </Label>
                 <Input
                   id="current_password"
                   name="current_password"
@@ -260,10 +329,13 @@ export default function ProfileSettingsPage() {
                   value={passwords.current_password}
                   onChange={handlePasswordChange}
                   required
+                  placeholder="Masukkan password saat ini"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="new_password">Password Baru</Label>
+                <Label htmlFor="new_password">
+                  Password Baru <span className="text-red-500">*</span>
+                </Label>
                 <Input
                   id="new_password"
                   name="new_password"
@@ -271,11 +343,13 @@ export default function ProfileSettingsPage() {
                   value={passwords.new_password}
                   onChange={handlePasswordChange}
                   required
+                  placeholder="Minimal 8 karakter"
                 />
               </div>
-              <div className="space-y-2 mb-4">
+              <div className="space-y-2">
                 <Label htmlFor="confirm_password">
-                  Konfirmasi Password Baru
+                  Konfirmasi Password Baru{" "}
+                  <span className="text-red-500">*</span>
                 </Label>
                 <Input
                   id="confirm_password"
@@ -284,16 +358,28 @@ export default function ProfileSettingsPage() {
                   value={passwords.confirm_password}
                   onChange={handlePasswordChange}
                   required
+                  placeholder="Ketik ulang password baru"
                 />
               </div>
-            </CardContent>
-            <CardFooter>
-              <Button type="submit" disabled={isPasswordSubmitting}>
-                {isPasswordSubmitting ? "Menyimpan..." : "Ubah Password"}
+            </div>
+
+            <div className="flex justify-end pt-6 border-t mt-8">
+              <Button
+                type="submit"
+                variant="secondary"
+                disabled={isPasswordSubmitting}
+              >
+                {isPasswordSubmitting ? (
+                  "Menyimpan..."
+                ) : (
+                  <>
+                    <ShieldCheck className="w-4 h-4 mr-2" /> Perbarui Password
+                  </>
+                )}
               </Button>
-            </CardFooter>
+            </div>
           </form>
-        </Card>
+        </div>
       </main>
     </>
   );

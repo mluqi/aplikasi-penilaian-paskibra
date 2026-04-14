@@ -72,51 +72,78 @@ export function NavUser() {
           <DropdownMenuTrigger asChild>
             <SidebarMenuButton
               size="lg"
-              className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+              className="data-[state=open]:bg-muted data-[state=open]:text-foreground hover:bg-muted transition-all duration-200"
             >
-              <Avatar className="h-8 w-8 rounded-lg">
-                {photoSrc && <AvatarImage src={photoSrc} alt={user.name} />}
-                <AvatarFallback className="rounded-lg">
+              <Avatar className="h-9 w-9 rounded-lg border border-border/50 shadow-sm">
+                {photoSrc && (
+                  <AvatarImage
+                    src={photoSrc}
+                    alt={user.name}
+                    className="object-cover"
+                  />
+                )}
+                <AvatarFallback className="rounded-lg bg-primary/10 text-primary font-bold">
                   {getInitials(user.name)}
                 </AvatarFallback>
               </Avatar>
               <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-medium">{user.name}</span>
-                <span className="truncate text-xs">{user.email}</span>
+                <span className="truncate font-bold">{user.name}</span>
+                <span className="truncate text-[11px] text-muted-foreground font-medium">
+                  {user.email}
+                </span>
               </div>
-              <ChevronsUpDown className="ml-auto size-4" />
+              <ChevronsUpDown className="ml-auto size-4 text-muted-foreground" />
             </SidebarMenuButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent
-            className="w-[var(--radix-dropdown-menu-trigger-width)] min-w-56 rounded-lg"
+            className="w-[var(--radix-dropdown-menu-trigger-width)] min-w-56 rounded-xl border-border/50 shadow-lg"
             align="end"
             sideOffset={4}
           >
             <DropdownMenuLabel className="p-0 font-normal">
-              <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
+              <div className="flex items-center gap-3 px-3 py-2.5 text-left text-sm bg-muted/30 rounded-t-md mb-1 border-b border-border/50">
+                <Avatar className="h-9 w-9 rounded-lg border shadow-sm">
+                  {photoSrc && (
+                    <AvatarImage
+                      src={photoSrc}
+                      alt={user.name}
+                      className="object-cover"
+                    />
+                  )}
+                  <AvatarFallback className="rounded-lg bg-primary/10 text-primary font-bold">
+                    {getInitials(user.name)}
+                  </AvatarFallback>
+                </Avatar>
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-medium">{user.name}</span>
-                  <span className="truncate text-xs">{user.email}</span>
+                  <span className="truncate font-bold text-foreground">
+                    {user.name}
+                  </span>
+                  <span className="truncate text-[11px] text-muted-foreground font-medium">
+                    {user.email}
+                  </span>
                 </div>
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem asChild>
+              <DropdownMenuItem
+                asChild
+                className="cursor-pointer font-medium py-2"
+              >
                 <Link href="/admin/settings/profile">
-                  <UserIcon className="mr-2 h-4 w-4" />
-                  <span>Profil</span>
+                  <UserIcon className="mr-2 h-4 w-4 text-muted-foreground" />
+                  <span>Profil & Pengaturan</span>
                 </Link>
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuSub>
-              <DropdownMenuSubTrigger>
-                <Sun className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-                <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+              <DropdownMenuSubTrigger className="cursor-pointer font-medium py-2">
+                <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0 text-muted-foreground" />
+                <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100 text-muted-foreground" />
                 <span className="ml-2">Ganti Tema</span>
               </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent>
+              <DropdownMenuSubContent className="rounded-xl shadow-lg border-border/50">
                 <DropdownMenuItem onClick={() => setTheme("light")}>
                   Light
                 </DropdownMenuItem>
@@ -129,9 +156,12 @@ export function NavUser() {
               </DropdownMenuSubContent>
             </DropdownMenuSub>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => logout()}>
+            <DropdownMenuItem
+              onClick={() => logout()}
+              className="cursor-pointer font-medium py-2 text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-950/30"
+            >
               <LogOut className="mr-2 h-4 w-4" />
-              <span>Log out</span>
+              <span>Keluar Aplikasi</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

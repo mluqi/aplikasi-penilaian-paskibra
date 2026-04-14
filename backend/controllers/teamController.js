@@ -1,4 +1,11 @@
-const { Teams, Users, Anggota_team, sequelize } = require("../models");
+const {
+  Teams,
+  Users,
+  Anggota_team,
+  Event_teams,
+  Events,
+  sequelize,
+} = require("../models");
 const fs = require("fs");
 const path = require("path");
 const { logAktivitas } = require("../services/logService");
@@ -145,7 +152,25 @@ exports.getAllTeams = async (req, res) => {
 exports.getTeamById = async (req, res) => {
   try {
     const { id } = req.params;
-    const team = await Teams.findByPk(id);
+    const team = await Teams.findByPk(id, {
+      include: [
+        {
+          model: Event_teams,
+          include: [
+            {
+              model: Events,
+              attributes: ["event_id", "event_name", "event_tanggal"],
+            },
+          ],
+          attributes: ["event_id", "balance", "xenplatform_id"],
+        },
+        {
+          model: Users,
+          as: "User",
+          attributes: ["user_name", "user_email"],
+        },
+      ],
+    });
     if (!team) {
       return res.status(404).json({ message: "Tim tidak ditemukan." });
     }

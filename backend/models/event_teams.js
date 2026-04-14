@@ -33,6 +33,19 @@ module.exports = (sequelize, DataTypes) => {
         onUpdate: "CASCADE",
         onDelete: "CASCADE",
       },
+      xenplatform_id: {
+        type: DataTypes.STRING,
+      },
+      xenplatform_data: {
+        type: DataTypes.TEXT,
+      },
+      qris_data: {
+        type: DataTypes.TEXT,
+      },
+      balance: {
+        type: DataTypes.BIGINT,
+        defaultValue: 0,
+      },
     },
     {
       sequelize,

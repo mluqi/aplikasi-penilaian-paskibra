@@ -7,7 +7,14 @@ import useAuth from "@/hooks/useAuth";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Users, Shield, Calendar, UserCog, ArrowRight } from "lucide-react";
+import {
+  Users,
+  Shield,
+  Calendar,
+  UserCog,
+  ArrowRight,
+  ShieldCheck,
+} from "lucide-react";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -49,6 +56,8 @@ export default function DashboardPage() {
   const [adminLoading, setAdminLoading] = useState(true);
   const [coordinatorData, setCoordinatorData] = useState([]);
   const [coordinatorLoading, setCoordinatorLoading] = useState(true);
+  const [juriSummary, setJuriSummary] = useState(null);
+  const [juriLoading, setJuriLoading] = useState(true);
 
   useEffect(() => {
     const fetchSummary = async () => {
@@ -83,23 +92,37 @@ export default function DashboardPage() {
             ? response.data.teams
             : response.data.events;
         const myItems = allItems.filter(
-          (item) => item.koordinator_id === user.id
+          (item) => item.koordinator_id === user.id,
         );
         setCoordinatorData(myItems);
       } catch (error) {
         toast.error(
           `Gagal memuat data ${
             user.role === "koordinator_team" ? "tim" : "event"
-          } Anda.`
+          } Anda.`,
         );
       } finally {
         setCoordinatorLoading(false);
       }
     };
 
+    const fetchJuriSummary = async () => {
+      if (user?.role === "juri") {
+        try {
+          const response = await api.get("/dashboard/juri-summary");
+          setJuriSummary(response.data.summary);
+        } catch (error) {
+          toast.error("Gagal memuat ringkasan juri.");
+        } finally {
+          setJuriLoading(false);
+        }
+      }
+    };
+
     if (user) {
       fetchSummary();
       fetchCoordinatorData();
+      fetchJuriSummary();
     }
   }, [user]);
 
@@ -246,17 +269,45 @@ export default function DashboardPage() {
         )}
 
         {user?.role === "juri" && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Selamat Datang, Juri!</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p>
-                Silakan pilih menu 'Input Penilaian' atau 'Manajemen Event'
-                untuk memulai.
-              </p>
-            </CardContent>
-          </Card>
+          <div className="space-y-4">
+            <h2 className="text-xl font-semibold mb-4">Ringkasan Tugas Anda</h2>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {juriLoading ? (
+                <>
+                  <SkeletonCard />
+                  <SkeletonCard />
+                </>
+              ) : juriSummary ? (
+                <>
+                  <StatCard
+                    title="Event Ditugaskan"
+                    value={juriSummary.assignedEvents}
+                    description="Jumlah event di mana Anda bertugas sebagai juri"
+                    icon={<Calendar className="h-4 w-4 text-blue-500" />}
+                  />
+                  <StatCard
+                    title="Tim Dinilai"
+                    value={juriSummary.assessedTeams}
+                    description="Total tim yang sudah Anda berikan penilaian"
+                    icon={<ShieldCheck className="h-4 w-4 text-emerald-500" />}
+                  />
+                </>
+              ) : null}
+              <Card className="border-primary/20 bg-primary/5 lg:col-span-1 md:col-span-2">
+                <CardContent className="p-6 flex flex-col items-start justify-center h-full gap-4">
+                  <p className="text-sm text-muted-foreground">
+                    Akses halaman Input Penilaian untuk mulai memberikan skor
+                    pada tim yang bertanding.
+                  </p>
+                  <Button asChild className="w-full">
+                    <Link href="/admin/penilaian">
+                      Mulai Penilaian <ArrowRight className="ml-2 h-4 w-4" />
+                    </Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
         )}
       </main>
     </ProtectedRoute>

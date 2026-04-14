@@ -1,4 +1,11 @@
-const { Users, Teams, Events, sequelize } = require("../models");
+const {
+  Users,
+  Teams,
+  Events,
+  Event_juri,
+  Penilaian,
+  sequelize,
+} = require("../models");
 
 exports.getSummary = async (req, res) => {
   try {
@@ -16,6 +23,30 @@ exports.getSummary = async (req, res) => {
     });
   } catch (error) {
     console.error("Error fetching dashboard summary:", error);
+    res.status(500).json({ message: "Terjadi kesalahan server." });
+  }
+};
+
+exports.getJuriSummary = async (req, res) => {
+  try {
+    const { id: juriId } = req.user;
+
+    const assignedEventsCount = await Event_juri.count({
+      where: { juri_id: juriId },
+    });
+
+    const assessedTeamsCount = await Penilaian.count({
+      where: { juri_id: juriId },
+    });
+
+    res.status(200).json({
+      summary: {
+        assignedEvents: assignedEventsCount,
+        assessedTeams: assessedTeamsCount,
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching juri summary:", error);
     res.status(500).json({ message: "Terjadi kesalahan server." });
   }
 };

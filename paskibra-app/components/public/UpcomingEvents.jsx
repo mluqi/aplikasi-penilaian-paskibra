@@ -3,10 +3,8 @@
 import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Calendar, MapPin } from "lucide-react";
+import { MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
 
 const kategoriOptions = [
   { value: "smp", label: "SMP/Sederajat" },
@@ -15,69 +13,117 @@ const kategoriOptions = [
   { value: "umum", label: "Umum" },
 ];
 
+const tingkatOptions = [
+  { value: "kota_kabupaten", label: "Kota/Kabupaten" },
+  { value: "provinsi", label: "Provinsi" },
+  { value: "nasional", label: "Nasional" },
+];
+
 const capitalize = (s) => {
   if (typeof s !== "string") return "";
   return s.charAt(0).toUpperCase() + s.slice(1).replace(/_/g, " ");
 };
 
-const EventCard = ({ event }) => (
-  <div className="flex-shrink-0 w-full sm:w-1/2 md:w-1/2 lg:w-1/4 px-3">
-    <Card className="overflow-hidden h-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm hover:shadow-lg transition-all duration-300 hover:border-red-500 dark:hover:border-red-400 group">
-      <div className="relative h-48 w-full overflow-hidden">
-        <Image
-          src={
-            event.event_poster
-              ? `${process.env.NEXT_PUBLIC_API_URL}${event.event_poster}`
-              : "/default-poster.png"
-          }
-          alt={`Poster ${event.event_name}`}
-          fill
-          className="object-cover transition-transform duration-500 group-hover:scale-105"
-        />
-      </div>
-      <CardContent className="p-5 flex flex-col h-54">
-        <div className="flex flex-wrap gap-2 mb-3">
-          {event.event_kategori && (
-            <Badge variant="secondary" className="text-xs">
-              {kategoriOptions.find((opt) => opt.value === event.event_kategori)
-                ?.label || capitalize(event.event_kategori)}
-            </Badge>
-          )}
-        </div>
+const MONTHS_ID = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "Mei",
+  "Jun",
+  "Jul",
+  "Agt",
+  "Sep",
+  "Okt",
+  "Nov",
+  "Des",
+];
 
-        <h3 className="font-bold text-gray-900 dark:text-white mb-3 line-clamp-2 group-hover:text-red-600 transition-colors duration-300 text-lg leading-tight">
-          {event.event_name}
-        </h3>
+const parseDate = (dateStr) => {
+  const d = new Date(dateStr);
+  return {
+    day: d.getDate(),
+    month: MONTHS_ID[d.getMonth()],
+  };
+};
 
-        <div className="space-y-2 text-sm text-gray-600 dark:text-gray-300 mb-4 flex-grow">
-          <div className="flex items-center gap-2">
-            <Calendar className="h-4 w-4 text-red-500" />
-            <span className="text-sm">
-              {new Date(event.event_tanggal).toLocaleDateString("id-ID", {
-                year: "numeric",
-                month: "long",
-                day: "numeric",
-              })}
+const EventCard = ({ event }) => {
+  const { day, month } = parseDate(event.event_tanggal);
+  const kategoriLabel =
+    kategoriOptions.find((o) => o.value === event.event_kategori)?.label ||
+    capitalize(event.event_kategori);
+  const tingkatLabel =
+    tingkatOptions.find((o) => o.value === event.event_tingkat)?.label ||
+    capitalize(event.event_tingkat);
+
+  return (
+    <div className="flex-shrink-0 w-[260px] sm:w-[280px] md:w-[300px] px-3 py-4">
+      <div className="group flex flex-col rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm transition-all duration-300 hover:shadow-xl hover:-translate-y-1.5 h-full">
+        {/* POSTER */}
+        <div
+          className="relative w-full overflow-hidden"
+          style={{ aspectRatio: "2/3" }}
+        >
+          <Image
+            src={
+              event.event_poster
+                ? `${process.env.NEXT_PUBLIC_API_URL}${event.event_poster}`
+                : "/default-poster.png"
+            }
+            alt={`Poster ${event.event_name}`}
+            fill
+            className="object-cover transition-transform duration-500 group-hover:scale-105"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent pointer-events-none" />
+
+          <div className="absolute top-3 left-3 flex flex-wrap gap-1.5 z-10">
+            {event.event_kategori && (
+              <span className="text-[10px] font-semibold uppercase tracking-wide px-2.5 py-1 rounded-full backdrop-blur-md bg-white/15 border border-white/25 text-white">
+                {kategoriLabel}
+              </span>
+            )}
+            {event.event_tingkat && (
+              <span className="text-[10px] font-semibold uppercase tracking-wide px-2.5 py-1 rounded-full backdrop-blur-md bg-primary/80 border border-primary/40 text-primary-foreground">
+                {tingkatLabel}
+              </span>
+            )}
+          </div>
+
+          <div className="absolute bottom-3 right-3 z-10 flex flex-col items-center bg-black/55 backdrop-blur-md border border-white/15 rounded-xl px-3 py-2 leading-none">
+            <span className="text-xl font-bold text-amber-400">{day}</span>
+            <span className="text-[9px] uppercase tracking-widest text-white/60 mt-0.5">
+              {month}
             </span>
           </div>
-          <div className="flex items-center gap-2">
-            <MapPin className="h-4 w-4 text-red-500" />
-            <span className="text-sm line-clamp-1">
+        </div>
+
+        {/* CARD BODY */}
+        <div className="flex flex-col flex-grow p-4 gap-2">
+          <h2 className="text-sm font-bold text-gray-900 dark:text-white leading-snug line-clamp-2">
+            {event.event_name}
+          </h2>
+          <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">
+            {event.event_deskripsi}
+          </p>
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-auto pt-1">
+            <MapPin className="h-3.5 w-3.5 shrink-0 opacity-60" />
+            <span className="truncate">
               {event.event_kota}, {event.event_provinsi}
             </span>
           </div>
+          <Button
+            asChild
+            size="sm"
+            variant="outline"
+            className="mt-2 w-full rounded-xl border-gray-200 dark:border-gray-700 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-colors duration-200"
+          >
+            <Link href={`/events/${event.event_id}`}>Lihat Detail</Link>
+          </Button>
         </div>
-
-        <Button
-          asChild
-          className="w-full bg-red-600 hover:bg-red-700 text-white transition-colors duration-300"
-        >
-          <Link href={`/events/${event.event_id}`}>Lihat Detail</Link>
-        </Button>
-      </CardContent>
-    </Card>
-  </div>
-);
+      </div>
+    </div>
+  );
+};
 
 const UpcomingEvents = () => {
   const [events, setEvents] = useState([]);
@@ -127,7 +173,7 @@ const UpcomingEvents = () => {
         today.setHours(0, 0, 0, 0);
 
         const upcoming = (data.events || []).filter(
-          (event) => new Date(event.event_tanggal) >= today
+          (event) => new Date(event.event_tanggal) >= today,
         );
 
         setEvents(upcoming);

@@ -7,6 +7,7 @@ const {
 const {
   getSummary,
   getEventStats,
+  getJuriSummary,
 } = require("../controllers/dashboardController");
 
 // Semua rute di bawah ini memerlukan token
@@ -16,7 +17,12 @@ router.get("/summary", authorizeRoles("superadmin", "admin"), getSummary);
 router.get(
   "/event-stats",
   authorizeRoles("superadmin", "admin"),
-  getEventStats
+  getEventStats,
+);
+router.get(
+  "/juri-summary",
+  authorizeRoles("juri", "superadmin", "admin"),
+  getJuriSummary,
 );
 
 module.exports = router;

@@ -41,6 +41,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -54,7 +55,15 @@ import {
   Edit,
   ListTree,
   Settings,
+  RefreshCcw,
+  MapPin,
+  Building2,
+  Hourglass,
+  Wallet,
+  Phone,
+  CalendarIcon as CalendarCheck,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -192,7 +201,7 @@ const SubAspekManager = ({ aspek, onBack }) => {
       setSubAspeks(response.data);
       const total = response.data.reduce(
         (acc, sub) => acc + parseFloat(sub.bobot || 0),
-        0
+        0,
       );
       setTotalBobot(total);
     } catch (error) {
@@ -216,7 +225,7 @@ const SubAspekManager = ({ aspek, onBack }) => {
       if (selectedSubAspek) {
         await api.put(
           `/aspek/subaspek/${selectedSubAspek.subaspek_id}`,
-          payload
+          payload,
         );
         toast.success("Sub-aspek berhasil diperbarui.");
       } else {
@@ -238,7 +247,7 @@ const SubAspekManager = ({ aspek, onBack }) => {
       fetchSubAspeks();
     } catch (error) {
       toast.error(
-        error.response?.data?.message || "Gagal menghapus sub-aspek."
+        error.response?.data?.message || "Gagal menghapus sub-aspek.",
       );
     } finally {
       setIsAlertOpen(false);
@@ -394,7 +403,7 @@ const AspekManagementCard = ({ eventId }) => {
       setAspeks(response.data);
       const total = response.data.reduce(
         (acc, a) => acc + parseFloat(a.bobot || 0),
-        0
+        0,
       );
       setTotalBobotAspek(total);
     } catch (error) {
@@ -455,28 +464,42 @@ const AspekManagementCard = ({ eventId }) => {
 
   return (
     <>
-      <Card className="col-span-full">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="flex items-center gap-2">
-            <Settings className="h-5 w-5" /> Aspek Penilaian
+      <Card className="col-span-full shadow-sm border-border/50 overflow-hidden">
+        <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-muted/20 border-b pb-4 pt-5">
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <div className="p-2 bg-primary/10 rounded-lg">
+              <Settings className="h-5 w-5 text-primary" />
+            </div>
+            Aspek Penilaian
           </CardTitle>
-          <div className="flex items-center gap-4">
-            <div className="text-sm font-medium text-muted-foreground">
-              Total Bobot Aspek:{" "}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2 bg-background px-3 py-1.5 rounded-lg border shadow-sm">
+              <span className="text-sm font-medium text-muted-foreground">
+                Total Bobot:
+              </span>
               <span
-                className={`font-bold ${
-                  totalBobotAspek > 100 ? "text-red-500" : "text-primary"
-                }`}
+                className={cn(
+                  "text-sm font-bold px-2 py-0.5 rounded-md",
+                  totalBobotAspek === 100
+                    ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                    : totalBobotAspek > 100
+                      ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                      : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+                )}
               >
                 {totalBobotAspek.toFixed(2)} / 100
               </span>
             </div>
+            <Button
+              size="sm"
+              onClick={() => openAspekDialog()}
+              className="shadow-sm"
+            >
+              <PlusCircle className="mr-2 h-4 w-4" /> Tambah Aspek
+            </Button>
           </div>
-          <Button size="sm" onClick={() => openAspekDialog()}>
-            <PlusCircle className="mr-2 h-4 w-4" /> Tambah Aspek
-          </Button>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           <Table>
             <TableHeader>
               <TableRow>
@@ -615,9 +638,12 @@ export default function EventDetailPage() {
   const [allJuries, setAllJuries] = useState([]);
   const [selectedTeam, setSelectedTeam] = useState("");
   const [selectedJuri, setSelectedJuri] = useState("");
+  const [selectedPeranJuri, setSelectedPeranJuri] = useState("");
   const [itemToRemove, setItemToRemove] = useState(null);
   const [isAlertOpen, setIsAlertOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [isCreatingAccount, setIsCreatingAccount] = useState(false);
+  const [syncingTeamId, setSyncingTeamId] = useState(null);
 
   const fetchData = useCallback(async () => {
     if (!eventId) return;
@@ -658,14 +684,17 @@ export default function EventDetailPage() {
       const payload =
         type === "team"
           ? { event_id: eventId, team_id: id }
-          : { event_id: eventId, juri_id: id };
+          : { event_id: eventId, juri_id: id, peran_juri: selectedPeranJuri };
       await api.post(`/events/${type}`, payload);
       toast.success(
-        `${type === "team" ? "Tim" : "Juri"} berhasil ditambahkan.`
+        `${type === "team" ? "Tim" : "Juri"} berhasil ditambahkan.`,
       );
       fetchData();
       if (type === "team") setSelectedTeam("");
-      if (type === "juri") setSelectedJuri("");
+      if (type === "juri") {
+        setSelectedJuri("");
+        setSelectedPeranJuri("");
+      }
     } catch (error) {
       toast.error(error.response?.data?.message || "Gagal menambahkan.");
     }
@@ -696,17 +725,51 @@ export default function EventDetailPage() {
     setIsAlertOpen(true);
   };
 
+  const handleCreateAccount = async (teamId) => {
+    setIsCreatingAccount(true);
+    try {
+      await api.post("/events/team/xenplatform", {
+        event_id: eventId,
+        team_id: teamId,
+      });
+      toast.success("Akun XenPlatform berhasil dibuat.");
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Gagal membuat akun.");
+    } finally {
+      setIsCreatingAccount(false);
+    }
+  };
+
+  const handleSyncBalance = async (teamId) => {
+    setSyncingTeamId(teamId);
+    try {
+      const res = await api.post("/events/team/sync-balance", {
+        event_id: eventId,
+        team_id: teamId,
+      });
+      toast.success(res.data.message || "Saldo berhasil disinkronisasi.");
+      fetchData();
+    } catch (error) {
+      toast.error(
+        error.response?.data?.message || "Gagal menyinkronkan saldo.",
+      );
+    } finally {
+      setSyncingTeamId(null);
+    }
+  };
+
   if (loading) return <div>Memuat data...</div>;
   if (!event) return <div>Event tidak ditemukan.</div>;
 
   const participatingTeamIds = new Set(event.Event_teams.map((t) => t.team_id));
   const availableTeams = allTeams.filter(
-    (t) => !participatingTeamIds.has(t.team_id)
+    (t) => !participatingTeamIds.has(t.team_id),
   );
 
   const participatingJuriIds = new Set(event.Event_juris.map((j) => j.juri_id));
   const availableJuries = allJuries.filter(
-    (j) => !participatingJuriIds.has(j.user_id)
+    (j) => !participatingJuriIds.has(j.user_id),
   );
 
   return (
@@ -742,37 +805,106 @@ export default function EventDetailPage() {
 
       <main className="flex flex-1 flex-col gap-6 p-4 pt-0">
         {/* Event Header */}
-        <div className="flex items-center gap-4">
-          <Image
-            src={
-              event.event_poster
-                ? `${process.env.NEXT_PUBLIC_API_URL}${event.event_poster}`
-                : "/default-poster.png"
-            }
-            alt={`Poster ${event.event_name}`}
-            width={80}
-            height={112}
-            className="rounded-lg border object-cover p-1"
-          />
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">
-              {event.event_name}
-            </h1>
-            <p className="text-muted-foreground">
-              {format(new Date(event.event_tanggal), "EEEE, d MMMM yyyy", {
-                locale: id,
-              })}{" "}
-              di {event.event_tempat}
-            </p>
+        <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-800 p-5 md:p-6 mb-2">
+          <div className="flex flex-col md:flex-row gap-6 items-start">
+            <div className="w-full md:w-32 lg:w-40 shrink-0 mx-auto md:mx-0">
+              <Image
+                src={
+                  event.event_poster
+                    ? `${process.env.NEXT_PUBLIC_API_URL}${event.event_poster}`
+                    : "/default-poster.png"
+                }
+                alt={`Poster ${event.event_name}`}
+                width={160}
+                height={224}
+                className="rounded-xl border shadow-sm object-cover w-full h-auto aspect-[3/4]"
+              />
+            </div>
+            <div className="flex-1 w-full">
+              <h1 className="text-2xl md:text-3xl font-bold tracking-tight mb-2 text-gray-900 dark:text-white">
+                {event.event_name}
+              </h1>
+              <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground mb-6">
+                <span className="flex items-center gap-1.5">
+                  <CalendarCheck className="w-4 h-4 text-primary" />{" "}
+                  {format(new Date(event.event_tanggal), "EEEE, d MMMM yyyy", {
+                    locale: id,
+                  })}
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <MapPin className="w-4 h-4 text-primary" />{" "}
+                  {event.event_tempat}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-muted/30 rounded-xl border border-border/50">
+                <div className="space-y-1">
+                  <span className="text-xs text-muted-foreground flex items-center gap-1.5">
+                    <Building2 className="w-3.5 h-3.5" /> Penyelenggara
+                  </span>
+                  <p
+                    className="font-medium text-sm truncate"
+                    title={event.event_penyelenggara || "-"}
+                  >
+                    {event.event_penyelenggara || "-"}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <span className="text-xs text-muted-foreground flex items-center gap-1.5">
+                    <Hourglass className="w-3.5 h-3.5" /> Batas Daftar
+                  </span>
+                  <p className="font-medium text-sm">
+                    {event.event_batas_pendaftaran
+                      ? format(
+                          new Date(event.event_batas_pendaftaran),
+                          "d MMM yyyy",
+                          { locale: id },
+                        )
+                      : "-"}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <span className="text-xs text-muted-foreground flex items-center gap-1.5">
+                    <Wallet className="w-3.5 h-3.5" /> Biaya
+                  </span>
+                  <p className="font-medium text-sm text-green-600 dark:text-green-400">
+                    {event.event_biaya_pendaftaran === 0
+                      ? "Gratis"
+                      : new Intl.NumberFormat("id-ID", {
+                          style: "currency",
+                          currency: "IDR",
+                          maximumFractionDigits: 0,
+                        }).format(event.event_biaya_pendaftaran)}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <span className="text-xs text-muted-foreground flex items-center gap-1.5">
+                    <Phone className="w-3.5 h-3.5" /> Kontak
+                  </span>
+                  <p
+                    className="font-medium text-sm truncate"
+                    title={event.event_contact_person_name || "-"}
+                  >
+                    {event.event_contact_person_name || "-"}
+                    {event.event_contact_person_number
+                      ? ` (${event.event_contact_person_number})`
+                      : ""}
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-1">
+        <div className="grid gap-6 xl:grid-cols-2">
           {/* Kolom Tim Peserta */}
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
-                <Users className="h-5 w-5" /> Tim Peserta
+          <Card className="flex flex-col h-full shadow-sm border-border/50 overflow-hidden">
+            <CardHeader className="flex flex-row items-center justify-between bg-muted/20 border-b pb-4 pt-5">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <div className="p-2 bg-emerald-500/10 rounded-lg">
+                  <Users className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                </div>
+                Tim Peserta
               </CardTitle>
               {user?.role !== "juri" && (
                 <Dialog>
@@ -823,12 +955,13 @@ export default function EventDetailPage() {
                 </Dialog>
               )}
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-0 overflow-auto flex-1">
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>ID Tim</TableHead>
                     <TableHead>Nama Tim</TableHead>
+                    <TableHead>Status Donasi</TableHead>
                     {user?.role !== "juri" && (
                       <TableHead className="text-right">Aksi</TableHead>
                     )}
@@ -836,33 +969,93 @@ export default function EventDetailPage() {
                 </TableHeader>
                 <TableBody>
                   {event.Event_teams.length > 0 ? (
-                    event.Event_teams.map(({ Team }) => (
-                      <TableRow key={Team.team_id}>
-                        <TableCell className="font-mono text-xs">
-                          {Team.team_id}
-                        </TableCell>
-                        <TableCell className="font-medium">
-                          {Team.team_name}
-                        </TableCell>
-                        {user?.role !== "juri" && (
-                          <TableCell className="text-right">
-                            <Button
-                              variant="ghost"
-                              size="icon-sm"
-                              className="text-destructive"
-                              onClick={() =>
-                                openAlert("team", Team.team_id, Team.team_name)
-                              }
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                    event.Event_teams.map((eventTeam) => {
+                      const { Team, xenplatform_id, qris_data, balance } =
+                        eventTeam;
+                      return (
+                        <TableRow key={Team.team_id}>
+                          <TableCell className="font-mono text-xs">
+                            {Team.team_id}
                           </TableCell>
-                        )}
-                      </TableRow>
-                    ))
+                          <TableCell className="font-medium">
+                            {Team.team_name}
+                          </TableCell>
+                          <TableCell>
+                            {xenplatform_id ? (
+                              <div className="flex flex-col gap-1 items-start">
+                                <Badge className="bg-green-600 hover:bg-green-700">
+                                  Siap Menerima Donasi
+                                </Badge>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <span className="text-xs font-medium text-muted-foreground">
+                                    Saldo: Rp{" "}
+                                    {(Number(balance) || 0).toLocaleString(
+                                      "id-ID",
+                                    )}
+                                  </span>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-5 w-5 text-muted-foreground hover:text-primary"
+                                    onClick={() =>
+                                      handleSyncBalance(Team.team_id)
+                                    }
+                                    disabled={syncingTeamId === Team.team_id}
+                                    title="Sync Saldo"
+                                  >
+                                    <RefreshCcw
+                                      className={`h-3 w-3 ${syncingTeamId === Team.team_id ? "animate-spin" : ""}`}
+                                    />
+                                  </Button>
+                                </div>
+                              </div>
+                            ) : (
+                              <Badge variant="secondary">Belum ada Akun</Badge>
+                            )}
+                          </TableCell>
+                          {user?.role !== "juri" && (
+                            <TableCell className="text-right">
+                              <div className="flex justify-end items-center gap-2">
+                                {!xenplatform_id ? (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() =>
+                                      handleCreateAccount(Team.team_id)
+                                    }
+                                    disabled={isCreatingAccount}
+                                    title="Buat Akun XenPlatform"
+                                  >
+                                    <PlusCircle className="h-4 w-4 md:mr-2" />
+                                    <span className="hidden md:inline">
+                                      Buat Akun
+                                    </span>
+                                  </Button>
+                                ) : null}
+                                <Button
+                                  variant="ghost"
+                                  size="icon-sm"
+                                  className="text-destructive"
+                                  onClick={() =>
+                                    openAlert(
+                                      "team",
+                                      Team.team_id,
+                                      Team.team_name,
+                                    )
+                                  }
+                                  title="Hapus Tim"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          )}
+                        </TableRow>
+                      );
+                    })
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={3} className="h-24 text-center">
+                      <TableCell colSpan={4} className="h-24 text-center">
                         Belum ada tim peserta.
                       </TableCell>
                     </TableRow>
@@ -873,10 +1066,13 @@ export default function EventDetailPage() {
           </Card>
 
           {/* Kolom Dewan Juri */}
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
-                <ShieldCheck className="h-5 w-5" /> Dewan Juri
+          <Card className="flex flex-col h-full shadow-sm border-border/50 overflow-hidden">
+            <CardHeader className="flex flex-row items-center justify-between bg-muted/20 border-b pb-4 pt-5">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <div className="p-2 bg-blue-500/10 rounded-lg">
+                  <ShieldCheck className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                </div>
+                Dewan Juri
               </CardTitle>
               {user?.role !== "juri" && (
                 <Dialog>
@@ -914,6 +1110,16 @@ export default function EventDetailPage() {
                           )}
                         </SelectContent>
                       </Select>
+                      <Label htmlFor="peran_juri" className="mt-2 block">
+                        Peran / Tugas Juri
+                      </Label>
+                      <Input
+                        id="peran_juri"
+                        placeholder="Contoh: Juri PBB, Juri Formasi..."
+                        value={selectedPeranJuri}
+                        onChange={(e) => setSelectedPeranJuri(e.target.value)}
+                        required
+                      />
                     </div>
                     <DialogFooter>
                       <Button
@@ -927,12 +1133,13 @@ export default function EventDetailPage() {
                 </Dialog>
               )}
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-0 overflow-auto flex-1">
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>ID Juri</TableHead>
                     <TableHead>Nama Juri</TableHead>
+                    <TableHead>Peran</TableHead>
                     {user?.role !== "juri" && (
                       <TableHead className="text-right">Aksi</TableHead>
                     )}
@@ -940,13 +1147,16 @@ export default function EventDetailPage() {
                 </TableHeader>
                 <TableBody>
                   {event.Event_juris.length > 0 ? (
-                    event.Event_juris.map(({ User }) => (
-                      <TableRow key={User.user_id}>
+                    event.Event_juris.map((juriItem) => (
+                      <TableRow key={juriItem.User.user_id}>
                         <TableCell className="font-mono text-xs">
-                          {User.user_id}
+                          {juriItem.User.user_id}
                         </TableCell>
                         <TableCell className="font-medium">
-                          {User.user_name}
+                          {juriItem.User.user_name}
+                        </TableCell>
+                        <TableCell>
+                          {juriItem.peran_juri || "Juri Penilai"}
                         </TableCell>
                         {user?.role !== "juri" && (
                           <TableCell className="text-right">
@@ -955,7 +1165,11 @@ export default function EventDetailPage() {
                               size="icon-sm"
                               className="text-destructive"
                               onClick={() =>
-                                openAlert("juri", User.user_id, User.user_name)
+                                openAlert(
+                                  "juri",
+                                  juriItem.User.user_id,
+                                  juriItem.User.user_name,
+                                )
                               }
                             >
                               <Trash2 className="h-4 w-4" />

@@ -116,7 +116,6 @@ const FAQ = () => {
                       <span className="font-semibold text-gray-900 dark:text-white group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors duration-300 pr-4 text-base">
                         {faq.question}
                       </span>
-                      <ChevronDown className="h-5 w-5 shrink-0 text-gray-500 dark:text-gray-400 group-hover:text-red-600 dark:group-hover:text-red-400 transition-all duration-300 transform group-data-[state=open]:rotate-180" />
                     </div>
                   </AccordionTrigger>
                   <AccordionContent className="pb-6 text-gray-600 dark:text-gray-400 leading-relaxed border-t border-gray-100 dark:border-gray-700 pt-4">
