@@ -14,12 +14,12 @@ const nextConfig = {
       },
       {
         protocol: "https",
-        hostname: "images.unsplash.com", 
+        hostname: "images.unsplash.com",
         pathname: "**",
       },
       {
         protocol: "https",
-        hostname: "api.qrserver.com", 
+        hostname: "api.qrserver.com",
         pathname: "**",
       },
       {
@@ -35,12 +35,22 @@ const nextConfig = {
       {
         protocol: "http",
         hostname: "103.191.196.17",
-        port: "8003",
+        port: "8006",
         pathname: "**",
       },
       {
         protocol: "https",
         hostname: "dev8-p3.palindo.id",
+        pathname: "**",
+      },
+      {
+        protocol: "https",
+        hostname: "rekap-komando.palindo.id",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "api.palindo.id",
         pathname: "**",
       },
       {
@@ -58,15 +68,13 @@ const nextConfig = {
   // Add proxy rewrites for API and uploads
   async rewrites() {
     return [
-      // API Backend proxy to port 8002
       {
         source: "/api/:path*",
-        destination: "http://127.0.0.1:8003/api/:path*",
+        destination: "http://127.0.0.1:8006/api/:path*",
       },
-      // Uploads proxy to port 8002
       {
         source: "/uploads/:path*",
-        destination: "http://127.0.0.1:8003/uploads/:path*",
+        destination: "http://127.0.0.1:8006/uploads/:path*",
       },
     ];
   },
@@ -126,7 +134,13 @@ const nextConfig = {
     ];
   },
 
-  allowedDevOrigins: ["localhost", "103.191.196.17", "dev8-p3.palindo.id"],
+  allowedDevOrigins: [
+    "localhost",
+    "103.191.196.17",
+    "dev8-p3.palindo.id",
+    "rekap-komando.palindo.id",
+    "api.palindo.id",
+  ],
 };
 
 export default nextConfig;
