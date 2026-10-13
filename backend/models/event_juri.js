@@ -10,7 +10,12 @@ module.exports = (sequelize, DataTypes) => {
     static associate(models) {
       // define association here
       Event_juri.belongsTo(models.Events, { foreignKey: "event_id" });
-      Event_juri.belongsTo(models.Users, { foreignKey: "juri_id" });
+      Event_juri.belongsTo(models.Users, { as: "User", foreignKey: "juri_id" });
+      Event_juri.belongsToMany(models.Aspeks, {
+        through: models.Event_juri_aspeks,
+        foreignKey: "event_juri_id",
+        otherKey: "aspek_id",
+      });
     }
   }
   Event_juri.init(
@@ -40,7 +45,7 @@ module.exports = (sequelize, DataTypes) => {
       modelName: "Event_juri",
       tableName: "Event_juris",
       timestamps: false,
-    }
+    },
   );
   return Event_juri;
 };

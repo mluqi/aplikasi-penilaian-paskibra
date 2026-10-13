@@ -11,12 +11,12 @@ const Footer = () => {
             <Link href="/" className="flex items-center gap-2">
               <ShieldCheck className="h-8 w-8 text-red-600 dark:text-red-400" />
               <span className="text-xl font-bold text-gray-900 dark:text-white">
-                PaskibraApp
+                KomandoApp
               </span>
             </Link>
             <p className="mt-4 max-w-xs text-gray-600 dark:text-gray-400 leading-relaxed">
               Platform digital modern untuk manajemen dan penjurian lomba
-              Paskibra yang akurat, transparan, dan efisien.
+              yang akurat, transparan, dan efisien.
             </p>
             <div className="mt-8 flex space-x-6">
               <Link
@@ -146,10 +146,15 @@ const Footer = () => {
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <p className="text-sm text-gray-600 dark:text-gray-400 text-center md:text-left flex items-center gap-1">
               &copy; {new Date().getFullYear()}{" "}
-              <Link href="https://palindo.id" target="_blank" rel="noopener noreferrer" className="text-red-600 dark:text-red-400 hover:underline">
+              <Link
+                href="https://palindo.id"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-red-600 dark:text-red-400 hover:underline"
+              >
                 palindo.id
-              </Link>{" "}All rights
-              reserved.
+              </Link>{" "}
+              All rights reserved.
             </p>
           </div>
         </div>

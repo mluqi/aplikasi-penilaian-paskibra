@@ -13,7 +13,7 @@ export default function PrivacyPolicyPage() {
         <div className="container mx-auto px-4">
           <div className="prose prose-lg dark:prose-invert max-w-4xl mx-auto">
             <p>
-              Kebijakan Privasi ini menjelaskan bagaimana PaskibraApp ("kami",
+              Kebijakan Privasi ini menjelaskan bagaimana KomandoApp ("kami",
               "kita", atau "milik kami") mengumpulkan, menggunakan, dan
               mengungkapkan informasi Anda saat Anda menggunakan layanan kami.
             </p>

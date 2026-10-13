@@ -42,9 +42,7 @@ const Header = () => {
         <div className="flex h-16 items-center justify-between px-4 md:px-5 lg:px-8 gap-4 lg:gap-12">
           <Link href="/" className="flex items-center gap-2 shrink-0">
             <ShieldCheck className="h-8 w-8 text-primary" />
-            <span className="text-xl font-bold tracking-tight">
-              PaskibraApp
-            </span>
+            <span className="text-xl font-bold tracking-tight">KomandoApp</span>
           </Link>
 
           <div className="hidden md:block">
@@ -55,7 +53,7 @@ const Header = () => {
             <ThemeToggle />
             <Button
               asChild
-              className="rounded-full px-6 font-semibold shadow-sm hover:shadow-md transition-all"
+              className="rounded-full px-6 font-semibold bg-red-600 hover:bg-red-700 border border-red-800 text-white shadow-sm hover:shadow-md transition-all"
             >
               <Link href="/auth/login">Login</Link>
             </Button>

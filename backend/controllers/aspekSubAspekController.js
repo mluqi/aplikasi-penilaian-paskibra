@@ -1,6 +1,13 @@
-const { Aspeks, SubAspeks, AspekNilais, SubAspekNilais } = require("../models");
+const {
+  Aspeks,
+  SubAspeks,
+  AspekNilais,
+  SubAspekNilais,
+  sequelize,
+} = require("../models");
 const { Op } = require("sequelize");
 const { logAktivitas } = require("../services/logService");
+const xlsx = require("xlsx");
 
 const generateAspekId = async (event_id) => {
   const lastAspek = await Aspeks.findOne({
@@ -63,6 +70,200 @@ exports.getAllAspekSubAspek = async (req, res) => {
   }
 };
 
+// Export Aspek & Sub-Aspek ke format Excel
+exports.exportAspekExcel = async (req, res) => {
+  try {
+    const { event_id } = req.params;
+    const aspeks = await Aspeks.findAll({
+      where: { event_id },
+      include: [{ model: SubAspeks }],
+      order: [
+        ["urutan", "ASC"],
+        [SubAspeks, "urutan", "ASC"],
+      ],
+    });
+
+    const data = [];
+
+    aspeks.forEach((aspek) => {
+      if (aspek.SubAspeks && aspek.SubAspeks.length > 0) {
+        aspek.SubAspeks.forEach((sub) => {
+          data.push({
+            Aspek: aspek.nama_aspek,
+            "Urutan Aspek": aspek.urutan || "",
+            Kategori: sub.kategori || "",
+            "Sub Aspek": sub.nama_subaspek,
+            "Nilai Kurang Sekali": sub.nilai_kurang_sekali,
+            "Nilai Kurang": sub.nilai_kurang,
+            "Nilai Cukup": sub.nilai_cukup,
+            "Nilai Baik": sub.nilai_baik,
+            "Nilai Sangat Baik": sub.nilai_sangat_baik,
+            "Urutan Sub Aspek": sub.urutan || "",
+          });
+        });
+      } else {
+        data.push({
+          Aspek: aspek.nama_aspek,
+          "Urutan Aspek": aspek.urutan || "",
+        });
+      }
+    });
+
+    const ws = xlsx.utils.json_to_sheet(data);
+    const wb = xlsx.utils.book_new();
+    xlsx.utils.book_append_sheet(wb, ws, "Format Penilaian");
+
+    const buffer = xlsx.write(wb, { type: "buffer", bookType: "xlsx" });
+
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    );
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="format_penilaian_${event_id}.xlsx"`,
+    );
+    res.status(200).send(buffer);
+  } catch (error) {
+    console.error("Error exporting Excel:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+// Import Aspek & Sub-Aspek dari format Excel
+exports.importAspekExcel = async (req, res) => {
+  const t = await sequelize.transaction();
+  try {
+    const { event_id } = req.params;
+    const { excel_data } = req.body;
+
+    if (!excel_data) {
+      await t.rollback();
+      return res.status(400).json({ message: "Data Excel tidak ditemukan." });
+    }
+
+    const buffer = Buffer.from(excel_data, "base64");
+    const workbook = xlsx.read(buffer, { type: "buffer" });
+    const sheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[sheetName];
+    const rows = xlsx.utils.sheet_to_json(worksheet);
+
+    if (!rows || rows.length === 0) {
+      await t.rollback();
+      return res
+        .status(400)
+        .json({ message: "File Excel kosong atau format tidak valid." });
+    }
+
+    const aspekMap = new Map();
+    rows.forEach((row) => {
+      const nama_aspek = row["Aspek"];
+      const urutan_aspek = row["Urutan Aspek"];
+      const kategori = row["Kategori"];
+      const nama_subaspek = row["Sub Aspek"];
+      const nilai_kurang_sekali = row["Nilai Kurang Sekali"] || row["Nilai KS"];
+      const nilai_kurang = row["Nilai Kurang"];
+      const nilai_cukup = row["Nilai Cukup"];
+      const nilai_baik = row["Nilai Baik"];
+      const nilai_sangat_baik = row["Nilai Sangat Baik"];
+      const urutan_subaspek = row["Urutan Sub Aspek"];
+
+      if (!nama_aspek) return;
+
+      if (!aspekMap.has(nama_aspek)) {
+        aspekMap.set(nama_aspek, {
+          nama_aspek: String(nama_aspek),
+          urutan: parseInt(urutan_aspek) || 1,
+          sub_aspeks: [],
+        });
+      }
+
+      if (nama_subaspek) {
+        aspekMap.get(nama_aspek).sub_aspeks.push({
+          nama_subaspek: String(nama_subaspek),
+          kategori: kategori ? String(kategori) : null,
+          nilai_kurang_sekali:
+            nilai_kurang_sekali !== undefined
+              ? String(nilai_kurang_sekali).replace(/\s+/g, "")
+              : "",
+          nilai_kurang:
+            nilai_kurang !== undefined
+              ? String(nilai_kurang).replace(/\s+/g, "")
+              : "",
+          nilai_cukup:
+            nilai_cukup !== undefined
+              ? String(nilai_cukup).replace(/\s+/g, "")
+              : "",
+          nilai_baik:
+            nilai_baik !== undefined
+              ? String(nilai_baik).replace(/\s+/g, "")
+              : "",
+          nilai_sangat_baik:
+            nilai_sangat_baik !== undefined
+              ? String(nilai_sangat_baik).replace(/\s+/g, "")
+              : "",
+          urutan: parseInt(urutan_subaspek) || 1,
+        });
+      }
+    });
+
+    const lastAspek = await Aspeks.findOne({
+      where: { event_id },
+      order: [["aspek_id", "DESC"]],
+      transaction: t,
+    });
+
+    let lastAspekNum =
+      lastAspek && lastAspek.aspek_id
+        ? parseInt(lastAspek.aspek_id.substring(3, 6), 10)
+        : 0;
+
+    for (const [_, aspekData] of aspekMap) {
+      lastAspekNum++;
+      const aspek_id = `ASP${lastAspekNum.toString().padStart(3, "0")}-${event_id}`;
+
+      await Aspeks.create(
+        {
+          aspek_id,
+          event_id,
+          nama_aspek: aspekData.nama_aspek,
+          urutan: aspekData.urutan,
+        },
+        { transaction: t },
+      );
+
+      let lastSubAspekNum = 0;
+      for (const sub of aspekData.sub_aspeks) {
+        lastSubAspekNum++;
+        const subaspek_id = `SUB-${aspek_id}-${lastSubAspekNum.toString().padStart(3, "0")}`;
+
+        await SubAspeks.create(
+          {
+            subaspek_id,
+            aspek_id,
+            nama_subaspek: sub.nama_subaspek,
+            kategori: sub.kategori,
+            nilai_kurang_sekali: sub.nilai_kurang_sekali,
+            nilai_kurang: sub.nilai_kurang,
+            nilai_cukup: sub.nilai_cukup,
+            nilai_baik: sub.nilai_baik,
+            nilai_sangat_baik: sub.nilai_sangat_baik,
+            urutan: sub.urutan,
+          },
+          { transaction: t },
+        );
+      }
+    }
+
+    await t.commit();
+    res.status(200).json({ message: "Format penilaian berhasil diimport." });
+  } catch (error) {
+    await t.rollback();
+    console.error("Error importing CSV:", error);
+    res.status(500).json({ message: "Terjadi kesalahan saat import data." });
+  }
+};
+
 // Fungsi untuk mendapatkan aspek dan sub-aspek berdasarkan penilaian_id
 exports.getAspekSubAspekByPenilaianId = async (req, res) => {
   const { penilaian_id } = req.params;
@@ -97,7 +298,7 @@ exports.getAspekSubAspekByPenilaianId = async (req, res) => {
   } catch (error) {
     console.error(
       "Error fetching aspek and sub-aspek data by penilaian_id:",
-      error
+      error,
     );
     res.status(500).json({ message: "Internal server error" });
   }
@@ -105,30 +306,15 @@ exports.getAspekSubAspekByPenilaianId = async (req, res) => {
 
 exports.createAspek = async (req, res) => {
   try {
-    const { event_id, nama_aspek, bobot, urutan } = req.body;
+    const { event_id, nama_aspek, urutan } = req.body;
     if (!event_id)
       return res.status(400).json({ message: "event_id diperlukan." });
-
-    // Validasi total bobot aspek
-    const existingAspeks = await Aspeks.findAll({ where: { event_id } });
-    const currentTotalBobot = existingAspeks.reduce(
-      (sum, aspek) => sum + parseFloat(aspek.bobot),
-      0
-    );
-    if (currentTotalBobot + parseFloat(bobot) > 100) {
-      return res.status(400).json({
-        message: `Total bobot aspek akan melebihi 100. Sisa bobot yang tersedia: ${
-          100 - currentTotalBobot
-        }%.`,
-      });
-    }
 
     const aspek_id = await generateAspekId(event_id);
     const createData = {
       aspek_id,
       event_id,
       nama_aspek,
-      bobot,
       urutan,
     };
     const newAspek = await Aspeks.create(createData);
@@ -160,6 +346,7 @@ exports.getAllAspeks = async (req, res) => {
     res.status(200).json(aspeks);
   } catch (error) {
     console.error("Error fetching aspeks:", error);
+    res.status(500).json({ message: "Internal server error" });
   }
 };
 
@@ -182,33 +369,14 @@ exports.getAspeksById = async (req, res) => {
 exports.updateAspek = async (req, res) => {
   try {
     const { aspek_id } = req.params;
-    const { nama_aspek, bobot, urutan } = req.body;
+    const { nama_aspek, urutan } = req.body;
     const aspek = await Aspeks.findByPk(aspek_id);
-
-    if (bobot && aspek) {
-      // Validasi total bobot aspek saat update
-      const otherAspeks = await Aspeks.findAll({
-        where: { event_id: aspek.event_id, aspek_id: { [Op.ne]: aspek_id } },
-      });
-      const otherTotalBobot = otherAspeks.reduce(
-        (sum, a) => sum + parseFloat(a.bobot),
-        0
-      );
-      if (otherTotalBobot + parseFloat(bobot) > 100) {
-        return res.status(400).json({
-          message: `Total bobot aspek akan melebihi 100. Sisa bobot yang tersedia (tanpa aspek ini): ${
-            100 - otherTotalBobot
-          }%.`,
-        });
-      }
-    }
 
     if (!aspek) {
       return res.status(404).json({ message: "Aspek tidak ditemukan." });
     }
     const updateData = {
       nama_aspek: nama_aspek ?? aspek.nama_aspek,
-      bobot: bobot ?? aspek.bobot,
       urutan: urutan ?? aspek.urutan,
     };
     await aspek.update(updateData);
@@ -257,28 +425,30 @@ exports.deleteAspek = async (req, res) => {
 
 exports.createSubAspek = async (req, res) => {
   try {
-    const { aspek_id, nama_subaspek, bobot, urutan, event_id } = req.body;
-
-    // Validasi total bobot sub-aspek
-    const existingSubAspeks = await SubAspeks.findAll({ where: { aspek_id } });
-    const currentTotalBobot = existingSubAspeks.reduce(
-      (sum, sub) => sum + parseFloat(sub.bobot),
-      0
-    );
-    if (currentTotalBobot + parseFloat(bobot) > 100) {
-      return res.status(400).json({
-        message: `Total bobot sub-aspek akan melebihi 100. Sisa bobot yang tersedia: ${
-          100 - currentTotalBobot
-        }%.`,
-      });
-    }
+    const {
+      aspek_id,
+      nama_subaspek,
+      kategori,
+      nilai_kurang_sekali,
+      nilai_kurang,
+      nilai_cukup,
+      nilai_baik,
+      nilai_sangat_baik,
+      urutan,
+      event_id,
+    } = req.body;
 
     const subaspek_id = await generateSubAspekId(aspek_id, event_id);
     const createData = {
       subaspek_id,
       aspek_id,
       nama_subaspek,
-      bobot,
+      kategori,
+      nilai_kurang_sekali,
+      nilai_kurang,
+      nilai_cukup,
+      nilai_baik,
+      nilai_sangat_baik,
       urutan,
     };
     const newSubAspek = await SubAspeks.create(createData);
@@ -325,35 +495,29 @@ exports.getSubAspeksByAspekId = async (req, res) => {
 exports.updateSubAspek = async (req, res) => {
   try {
     const { subaspek_id } = req.params;
-    const { nama_subaspek, bobot, urutan } = req.body;
+    const {
+      nama_subaspek,
+      kategori,
+      nilai_kurang_sekali,
+      nilai_kurang,
+      nilai_cukup,
+      nilai_baik,
+      nilai_sangat_baik,
+      urutan,
+    } = req.body;
     const subaspek = await SubAspeks.findByPk(subaspek_id);
 
-    if (bobot && subaspek) {
-      // Validasi total bobot sub-aspek saat update
-      const otherSubAspeks = await SubAspeks.findAll({
-        where: {
-          aspek_id: subaspek.aspek_id,
-          subaspek_id: { [Op.ne]: subaspek_id },
-        },
-      });
-      const otherTotalBobot = otherSubAspeks.reduce(
-        (sum, s) => sum + parseFloat(s.bobot),
-        0
-      );
-      if (otherTotalBobot + parseFloat(bobot) > 100) {
-        return res.status(400).json({
-          message: `Total bobot sub-aspek akan melebihi 100. Sisa bobot yang tersedia (tanpa sub-aspek ini): ${
-            100 - otherTotalBobot
-          }%.`,
-        });
-      }
-    }
     if (!subaspek) {
       return res.status(404).json({ message: "Sub-Aspek tidak ditemukan." });
     }
     const updateData = {
       nama_subaspek: nama_subaspek ?? subaspek.nama_subaspek,
-      bobot: bobot ?? subaspek.bobot,
+      kategori: kategori !== undefined ? kategori : subaspek.kategori,
+      nilai_kurang_sekali: nilai_kurang_sekali ?? subaspek.nilai_kurang_sekali,
+      nilai_kurang: nilai_kurang ?? subaspek.nilai_kurang,
+      nilai_cukup: nilai_cukup ?? subaspek.nilai_cukup,
+      nilai_baik: nilai_baik ?? subaspek.nilai_baik,
+      nilai_sangat_baik: nilai_sangat_baik ?? subaspek.nilai_sangat_baik,
       urutan: urutan ?? subaspek.urutan,
     };
     await subaspek.update(updateData);

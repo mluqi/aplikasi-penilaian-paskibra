@@ -49,6 +49,11 @@ import {
   PhoneCall,
   FileText,
   ImageIcon,
+  Check,
+  ChevronsUpDown,
+  ChevronLeft,
+  ChevronRight,
+  Search,
 } from "lucide-react";
 import {
   Breadcrumb,
@@ -63,6 +68,7 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 import useAuth from "@/hooks/useAuth";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { id } from "date-fns/locale";
 import { Textarea } from "@/components/ui/textarea";
@@ -114,8 +120,35 @@ const EventForm = ({
     event_contact_person_name: event?.event_contact_person_name || "",
     event_contact_person_number: event?.event_contact_person_number || "",
     event_kuota: event?.event_kuota || "",
+    donasi_mulai: event?.donasi_mulai ? new Date(event.donasi_mulai) : null,
+    donasi_selesai: event?.donasi_selesai
+      ? new Date(event.donasi_selesai)
+      : null,
+    is_result_show: event?.is_result_show || false,
   });
   const [poster, setPoster] = useState(null);
+  const [kejuaraanTemplate, setKejuaraanTemplate] = useState(() => {
+    if (event?.kejuaraan_template) {
+      try {
+        return typeof event.kejuaraan_template === "string"
+          ? JSON.parse(event.kejuaraan_template)
+          : event.kejuaraan_template;
+      } catch (e) {
+        return [];
+      }
+    }
+    return [];
+  });
+  // Convert legacy format to objects when initializing state
+  useEffect(() => {
+    setKejuaraanTemplate((prev) =>
+      prev.map((item) =>
+        typeof item === "string" ? { name: item, numbered: true } : item,
+      ),
+    );
+  }, []);
+  const [newTemplateInput, setNewTemplateInput] = useState("");
+  const [newTemplateNumbered, setNewTemplateNumbered] = useState(true);
   const [posterPreview, setPosterPreview] = useState(null);
   const [juknis, setJuknis] = useState(null);
   const [juknisName, setJuknisName] = useState(event?.event_juknis || null);
@@ -124,6 +157,100 @@ const EventForm = ({
 
   const posterInputRef = useRef(null);
   const juknisInputRef = useRef(null);
+  const formRef = useRef(null);
+
+  const [step, setStep] = useState(1);
+  const isEditMode = !!event;
+
+  // State untuk dropdown Combobox
+  const [openProvinsi, setOpenProvinsi] = useState(false);
+  const [searchProvinsi, setSearchProvinsi] = useState("");
+  const [openKota, setOpenKota] = useState(false);
+  const [searchKota, setSearchKota] = useState("");
+  const [openKoordinator, setOpenKoordinator] = useState(false);
+  const [searchKoordinator, setSearchKoordinator] = useState("");
+
+  const filteredCoordinators = coordinators.filter((c) =>
+    c.user_name.toLowerCase().includes(searchKoordinator.toLowerCase()),
+  );
+
+  const steps = [
+    { id: 1, title: "Informasi Dasar" },
+    { id: 2, title: "Lokasi & Wilayah" },
+    { id: 3, title: "Jadwal & Klasifikasi" },
+    { id: 4, title: "Kontak & Publikasi" },
+    { id: 5, title: "Berkas Pendukung" },
+  ];
+
+  const handleNextStep = () => {
+    // Validasi per langkah untuk komponen kustom yang mengabaikan validasi HTML5
+    if (step === 1) {
+      if (!formData.event_name.trim())
+        return toast.error("Nama event wajib diisi.");
+      if (
+        formData.event_biaya_pendaftaran === "" ||
+        formData.event_biaya_pendaftaran === null
+      )
+        return toast.error(
+          "Biaya pendaftaran wajib diisi (isi 0 jika gratis).",
+        );
+    } else if (step === 2) {
+      if (!formData.event_provinsi)
+        return toast.error("Provinsi wajib dipilih.");
+      if (!formData.event_kota)
+        return toast.error("Kota/Kabupaten wajib dipilih.");
+      if (!formData.event_tempat.trim())
+        return toast.error("Detail tempat wajib diisi.");
+    } else if (step === 3) {
+      if (!formData.event_tanggal)
+        return toast.error("Tanggal pelaksanaan wajib dipilih.");
+      if (!formData.event_waktu)
+        return toast.error("Waktu dimulai wajib diisi.");
+      if (!formData.event_kategori)
+        return toast.error("Kategori peserta wajib dipilih.");
+      if (!formData.event_tingkat)
+        return toast.error("Tingkat skala wajib dipilih.");
+    } else if (step === 4) {
+      if (
+        (user?.role === "admin" || user?.role === "superadmin") &&
+        !formData.koordinator_id
+      ) {
+        return toast.error("Koordinator event wajib dipilih.");
+      }
+    }
+
+    // Jalankan validasi bawaan HTML5 sebagai pengaman ganda
+    if (formRef.current && !formRef.current.checkValidity()) {
+      formRef.current.reportValidity();
+      return;
+    }
+
+    setStep((prev) => Math.min(prev + 1, 5));
+  };
+
+  const handlePrevStep = () => {
+    setStep((prev) => Math.max(prev - 1, 1));
+  };
+
+  const handleAddTemplate = () => {
+    if (newTemplateInput.trim()) {
+      setKejuaraanTemplate((prev) => [
+        ...prev,
+        {
+          name: newTemplateInput.trim().toUpperCase(),
+          numbered: newTemplateNumbered,
+        },
+      ]);
+      setNewTemplateInput("");
+      setNewTemplateNumbered(true);
+      setIsDirty(true);
+    }
+  };
+
+  const handleRemoveTemplate = (index) => {
+    setKejuaraanTemplate((prev) => prev.filter((_, i) => i !== index));
+    setIsDirty(true);
+  };
 
   // State untuk data wilayah
   const {
@@ -157,6 +284,13 @@ const EventForm = ({
     fetchProvinces();
   }, [fetchProvinces]);
 
+  const filteredProvinces = provinces.filter((p) =>
+    p.name.toLowerCase().includes(searchProvinsi.toLowerCase()),
+  );
+  const filteredCities = cities.filter((c) =>
+    c.name.toLowerCase().includes(searchKota.toLowerCase()),
+  );
+
   // Fetch data kota saat provinsi berubah
   useEffect(() => {
     if (formData.event_provinsi) {
@@ -177,11 +311,33 @@ const EventForm = ({
 
   const handlePosterChange = (e) => {
     const file = e.target.files[0];
-    if (file) {
-      setPoster(file);
-      setPosterPreview(URL.createObjectURL(file));
-      setIsDirty(true);
+    if (!file) return;
+
+    const MAX_SIZE = 1 * 1024 * 1024; // 1MB
+    const ALLOWED_TYPES = [
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+      "image/jpg",
+    ];
+
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      toast.error(
+        "Tipe file tidak valid. Harap unggah gambar (JPG, PNG, WEBP).",
+      );
+      e.target.value = "";
+      return;
     }
+
+    if (file.size > MAX_SIZE) {
+      toast.error(`Ukuran file terlalu besar. Maksimal 1MB.`);
+      e.target.value = "";
+      return;
+    }
+
+    setPoster(file);
+    setPosterPreview(URL.createObjectURL(file));
+    setIsDirty(true);
   };
 
   const handleJuknisChange = (e) => {
@@ -220,16 +376,59 @@ const EventForm = ({
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    // Validasi Menyeluruh (Terutama untuk Mode Edit di mana semua form tampil sekaligus)
+    if (!formData.event_name.trim())
+      return toast.error("Nama event wajib diisi.");
+    if (
+      formData.event_biaya_pendaftaran === "" ||
+      formData.event_biaya_pendaftaran === null
+    )
+      return toast.error("Biaya pendaftaran wajib diisi.");
+    if (!formData.event_provinsi) return toast.error("Provinsi wajib dipilih.");
+    if (!formData.event_kota)
+      return toast.error("Kota/Kabupaten wajib dipilih.");
+    if (!formData.event_tempat.trim())
+      return toast.error("Detail tempat wajib diisi.");
+    if (!formData.event_tanggal)
+      return toast.error("Tanggal pelaksanaan wajib dipilih.");
+    if (!formData.event_waktu) return toast.error("Waktu dimulai wajib diisi.");
+    if (!formData.event_kategori)
+      return toast.error("Kategori peserta wajib dipilih.");
+    if (!formData.event_tingkat)
+      return toast.error("Tingkat skala wajib dipilih.");
+    if (
+      (user?.role === "admin" || user?.role === "superadmin") &&
+      !formData.koordinator_id
+    )
+      return toast.error("Koordinator event wajib dipilih.");
+
     // Validasi: Batas pendaftaran tidak boleh melebihi tanggal pelaksanaan
     if (formData.event_batas_pendaftaran && formData.event_tanggal) {
       const batas = new Date(formData.event_batas_pendaftaran);
-      batas.setHours(0, 0, 0, 0);
       const pelaksanaan = new Date(formData.event_tanggal);
-      pelaksanaan.setHours(0, 0, 0, 0);
+
+      // Gabungkan jam pelaksanaan agar perbandingannya akurat
+      if (formData.event_waktu) {
+        const [hours, minutes] = formData.event_waktu.split(":");
+        pelaksanaan.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0);
+      } else {
+        pelaksanaan.setHours(23, 59, 59, 999);
+      }
 
       if (batas > pelaksanaan) {
         toast.error(
-          "Batas pendaftaran tidak boleh melebihi tanggal pelaksanaan event.",
+          "Batas waktu pendaftaran tidak boleh melebihi jadwal pelaksanaan event.",
+        );
+        return;
+      }
+    }
+
+    if (formData.donasi_mulai && formData.donasi_selesai) {
+      if (
+        new Date(formData.donasi_selesai) <= new Date(formData.donasi_mulai)
+      ) {
+        toast.error(
+          "Waktu berakhir E-Voting harus lebih besar dari waktu mulai.",
         );
         return;
       }
@@ -247,478 +446,906 @@ const EventForm = ({
       finalStatus = "archived";
     }
 
-    await onSave({ ...formData, event_status: finalStatus }, poster, juknis);
+    const finalData = { ...formData, event_status: finalStatus };
+    if (kejuaraanTemplate.length > 0) {
+      finalData.kejuaraan_template = JSON.stringify(kejuaraanTemplate);
+    } else {
+      finalData.kejuaraan_template = "";
+    }
+
+    await onSave(finalData, poster, juknis);
     setIsSubmitting(false);
   };
 
   return (
-    <form id="event-form" onSubmit={handleSubmit} className="space-y-8 py-2">
+    <form
+      ref={formRef}
+      id="event-form"
+      onSubmit={handleSubmit}
+      className="space-y-8 py-2"
+    >
+      {!isEditMode && (
+        <div className="mb-8 px-2 md:px-8">
+          <div className="flex items-center justify-between relative">
+            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-full h-1 bg-muted rounded-full -z-10"></div>
+            <div
+              className="absolute left-0 top-1/2 -translate-y-1/2 h-1 bg-primary rounded-full -z-10 transition-all duration-500"
+              style={{ width: `${((step - 1) / (5 - 1)) * 100}%` }}
+            ></div>
+            {steps.map((s) => (
+              <div
+                key={s.id}
+                className="flex flex-col items-center gap-2 bg-background px-2"
+              >
+                <div
+                  className={cn(
+                    "w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border-2 transition-all duration-500",
+                    step > s.id
+                      ? "bg-primary border-primary text-primary-foreground"
+                      : step === s.id
+                        ? "bg-background border-primary text-primary"
+                        : "bg-background border-muted text-muted-foreground",
+                  )}
+                >
+                  {step > s.id ? <Check className="w-4 h-4" /> : s.id}
+                </div>
+                <span
+                  className={cn(
+                    "text-xs font-semibold hidden md:block transition-colors duration-500 text-center max-w-[80px]",
+                    step >= s.id ? "text-foreground" : "text-muted-foreground",
+                  )}
+                >
+                  {s.title}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* ── SEKSI 1: INFORMASI DASAR ── */}
-      <div className="space-y-5 bg-muted/20 p-5 md:p-6 rounded-2xl border border-border/50">
-        <div className="flex items-center gap-2 border-b pb-3">
-          <Info className="w-5 h-5 text-primary" />
-          <h3 className="font-semibold text-lg text-foreground">
-            Informasi Dasar
-          </h3>
+      {(isEditMode || step === 1) && (
+        <div className="space-y-5 bg-muted/20 p-5 md:p-6 rounded-2xl border border-border/50">
+          <div className="flex items-center gap-2 border-b pb-3">
+            <Info className="w-5 h-5 text-primary" />
+            <h3 className="font-semibold text-lg text-foreground">
+              Informasi Dasar
+            </h3>
+          </div>
+          <div className="grid md:grid-cols-2 gap-5">
+            <div className="space-y-2 md:col-span-2">
+              <Label htmlFor="event_name">
+                Nama Event <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="event_name"
+                name="event_name"
+                value={formData.event_name}
+                onChange={handleChange}
+                placeholder="Contoh: Lomba Paskibraka Tingkat Provinsi 2024"
+                required
+              />
+            </div>
+            <div className="space-y-2 md:col-span-2">
+              <Label htmlFor="event_deskripsi">Deskripsi Lengkap</Label>
+              <Textarea
+                id="event_deskripsi"
+                name="event_deskripsi"
+                value={formData.event_deskripsi}
+                onChange={handleChange}
+                placeholder="Tuliskan deskripsi lengkap tentang event ini..."
+                className="min-h-[100px]"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="event_penyelenggara">
+                Instansi Penyelenggara
+              </Label>
+              <Input
+                id="event_penyelenggara"
+                name="event_penyelenggara"
+                value={formData.event_penyelenggara}
+                onChange={handleChange}
+                placeholder="Contoh: PPI Kota Bandung"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="event_biaya_pendaftaran">
+                Biaya Pendaftaran (Rp) <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="event_biaya_pendaftaran"
+                name="event_biaya_pendaftaran"
+                type="number"
+                value={formData.event_biaya_pendaftaran}
+                onChange={handleChange}
+                placeholder="0 jika gratis"
+                required
+              />
+            </div>
+          </div>
         </div>
-        <div className="grid md:grid-cols-2 gap-5">
-          <div className="space-y-2 md:col-span-2">
-            <Label htmlFor="event_name">
-              Nama Event <span className="text-red-500">*</span>
-            </Label>
-            <Input
-              id="event_name"
-              name="event_name"
-              value={formData.event_name}
-              onChange={handleChange}
-              placeholder="Contoh: Lomba Paskibraka Tingkat Provinsi 2024"
-              required
-            />
-          </div>
-          <div className="space-y-2 md:col-span-2">
-            <Label htmlFor="event_deskripsi">Deskripsi Lengkap</Label>
-            <Textarea
-              id="event_deskripsi"
-              name="event_deskripsi"
-              value={formData.event_deskripsi}
-              onChange={handleChange}
-              placeholder="Tuliskan deskripsi lengkap tentang event ini..."
-              className="min-h-[100px]"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="event_penyelenggara">Instansi Penyelenggara</Label>
-            <Input
-              id="event_penyelenggara"
-              name="event_penyelenggara"
-              value={formData.event_penyelenggara}
-              onChange={handleChange}
-              placeholder="Contoh: PPI Kota Bandung"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="event_biaya_pendaftaran">
-              Biaya Pendaftaran (Rp) <span className="text-red-500">*</span>
-            </Label>
-            <Input
-              id="event_biaya_pendaftaran"
-              name="event_biaya_pendaftaran"
-              type="number"
-              value={formData.event_biaya_pendaftaran}
-              onChange={handleChange}
-              placeholder="0 jika gratis"
-              required
-            />
-          </div>
-        </div>
-      </div>
+      )}
 
       {/* ── SEKSI 2: LOKASI & WILAYAH ── */}
-      <div className="space-y-5 bg-muted/20 p-5 md:p-6 rounded-2xl border border-border/50">
-        <div className="flex items-center gap-2 border-b pb-3">
-          <MapPin className="w-5 h-5 text-primary" />
-          <h3 className="font-semibold text-lg text-foreground">
-            Lokasi & Wilayah
-          </h3>
+      {(isEditMode || step === 2) && (
+        <div className="space-y-5 bg-muted/20 p-5 md:p-6 rounded-2xl border border-border/50">
+          <div className="flex items-center gap-2 border-b pb-3">
+            <MapPin className="w-5 h-5 text-primary" />
+            <h3 className="font-semibold text-lg text-foreground">
+              Lokasi & Wilayah
+            </h3>
+          </div>
+          <div className="grid md:grid-cols-2 gap-5">
+            <div className="space-y-2">
+              <Label htmlFor="event_provinsi">
+                Provinsi <span className="text-red-500">*</span>
+              </Label>
+              <Popover open={openProvinsi} onOpenChange={setOpenProvinsi}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={openProvinsi}
+                    className={cn(
+                      "w-full justify-between font-normal",
+                      !formData.event_provinsi && "text-muted-foreground",
+                    )}
+                  >
+                    <span className="truncate">
+                      {formData.event_provinsi ||
+                        (loadingProvinces ? "Memuat..." : "Pilih provinsi...")}
+                    </span>
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent
+                  className="w-[var(--radix-popover-trigger-width)] p-0"
+                  align="start"
+                >
+                  <div className="flex flex-col">
+                    <div className="p-2 border-b">
+                      <Input
+                        placeholder="Cari provinsi..."
+                        value={searchProvinsi}
+                        onChange={(e) => setSearchProvinsi(e.target.value)}
+                        className="h-8"
+                      />
+                    </div>
+                    <div className="max-h-60 overflow-y-auto p-1">
+                      {filteredProvinces.length > 0 ? (
+                        filteredProvinces.map((prov) => (
+                          <Button
+                            key={prov.id}
+                            variant="ghost"
+                            className="w-full justify-start font-normal"
+                            onClick={() => {
+                              setFormData((prev) => ({
+                                ...prev,
+                                event_provinsi: prov.name,
+                                event_kota: "",
+                              }));
+                              setCities([]);
+                              setIsDirty(true);
+                              setOpenProvinsi(false);
+                              setSearchProvinsi("");
+                            }}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4 shrink-0",
+                                formData.event_provinsi === prov.name
+                                  ? "opacity-100"
+                                  : "opacity-0",
+                              )}
+                            />
+                            {prov.name}
+                          </Button>
+                        ))
+                      ) : (
+                        <div className="py-6 text-center text-sm text-muted-foreground">
+                          Tidak ditemukan.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="event_kota">
+                Kota/Kabupaten <span className="text-red-500">*</span>
+              </Label>
+              <Popover open={openKota} onOpenChange={setOpenKota}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={openKota}
+                    disabled={!formData.event_provinsi || loadingCities}
+                    className={cn(
+                      "w-full justify-between font-normal",
+                      !formData.event_kota && "text-muted-foreground",
+                    )}
+                  >
+                    <span className="truncate">
+                      {formData.event_kota ||
+                        (loadingCities ? "Memuat..." : "Pilih kota/kab...")}
+                    </span>
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent
+                  className="w-[var(--radix-popover-trigger-width)] p-0"
+                  align="start"
+                >
+                  <div className="flex flex-col">
+                    <div className="p-2 border-b">
+                      <Input
+                        placeholder="Cari kota/kab..."
+                        value={searchKota}
+                        onChange={(e) => setSearchKota(e.target.value)}
+                        className="h-8"
+                      />
+                    </div>
+                    <div className="max-h-60 overflow-y-auto p-1">
+                      {filteredCities.length > 0 ? (
+                        filteredCities.map((city) => (
+                          <Button
+                            key={city.id}
+                            variant="ghost"
+                            className="w-full justify-start font-normal"
+                            onClick={() => {
+                              setFormData((prev) => ({
+                                ...prev,
+                                event_kota: city.name,
+                              }));
+                              setIsDirty(true);
+                              setOpenKota(false);
+                              setSearchKota("");
+                            }}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4 shrink-0",
+                                formData.event_kota === city.name
+                                  ? "opacity-100"
+                                  : "opacity-0",
+                              )}
+                            />
+                            {city.name}
+                          </Button>
+                        ))
+                      ) : (
+                        <div className="py-6 text-center text-sm text-muted-foreground">
+                          Tidak ditemukan.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div className="space-y-2 md:col-span-2">
+              <Label htmlFor="event_tempat">
+                Detail Tempat (Gedung/Lapangan){" "}
+                <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="event_tempat"
+                name="event_tempat"
+                value={formData.event_tempat}
+                onChange={handleChange}
+                placeholder="Contoh: GOR Basket Padjajaran"
+                required
+              />
+            </div>
+          </div>
         </div>
-        <div className="grid md:grid-cols-2 gap-5">
-          <div className="space-y-2">
-            <Label htmlFor="event_provinsi">
-              Provinsi <span className="text-red-500">*</span>
-            </Label>
-            <Select
-              value={formData.event_provinsi}
-              onValueChange={(value) => {
-                setFormData((prev) => ({
-                  ...prev,
-                  event_provinsi: value,
-                  event_kota: "",
-                }));
-                setCities([]);
-                setIsDirty(true);
-              }}
-            >
-              <SelectTrigger>
-                <SelectValue
-                  placeholder={
-                    loadingProvinces ? "Memuat..." : "Pilih provinsi"
-                  }
-                />
-              </SelectTrigger>
-              <SelectContent>
-                {provinces.map((prov) => (
-                  <SelectItem key={prov.id} value={prov.name}>
-                    {prov.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="event_kota">
-              Kota/Kabupaten <span className="text-red-500">*</span>
-            </Label>
-            <Select
-              value={formData.event_kota}
-              onValueChange={(value) => {
-                setFormData((prev) => ({ ...prev, event_kota: value }));
-                setIsDirty(true);
-              }}
-              disabled={!formData.event_provinsi || loadingCities}
-            >
-              <SelectTrigger>
-                <SelectValue
-                  placeholder={loadingCities ? "Memuat..." : "Pilih kota/kab."}
-                />
-              </SelectTrigger>
-              <SelectContent>
-                {cities.map((city) => (
-                  <SelectItem key={city.id} value={city.name}>
-                    {city.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2 md:col-span-2">
-            <Label htmlFor="event_tempat">
-              Detail Tempat (Gedung/Lapangan){" "}
-              <span className="text-red-500">*</span>
-            </Label>
-            <Input
-              id="event_tempat"
-              name="event_tempat"
-              value={formData.event_tempat}
-              onChange={handleChange}
-              placeholder="Contoh: GOR Basket Padjajaran"
-              required
-            />
-          </div>
-        </div>
-      </div>
+      )}
 
       {/* ── SEKSI 3: JADWAL & KLASIFIKASI ── */}
-      <div className="space-y-5 bg-muted/20 p-5 md:p-6 rounded-2xl border border-border/50">
-        <div className="flex items-center gap-2 border-b pb-3">
-          <CalendarIcon className="w-5 h-5 text-primary" />
-          <h3 className="font-semibold text-lg text-foreground">
-            Jadwal & Klasifikasi
-          </h3>
+      {(isEditMode || step === 3) && (
+        <div className="space-y-5 bg-muted/20 p-5 md:p-6 rounded-2xl border border-border/50">
+          <div className="flex items-center gap-2 border-b pb-3">
+            <CalendarIcon className="w-5 h-5 text-primary" />
+            <h3 className="font-semibold text-lg text-foreground">
+              Jadwal & Klasifikasi
+            </h3>
+          </div>
+          <div className="grid md:grid-cols-2 gap-5">
+            <div className="space-y-2">
+              <Label htmlFor="event_tanggal">
+                Tanggal Pelaksanaan <span className="text-red-500">*</span>
+              </Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant={"outline"}
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !formData.event_tanggal && "text-muted-foreground",
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {formData.event_tanggal ? (
+                      format(formData.event_tanggal, "PPP", { locale: id })
+                    ) : (
+                      <span>Pilih tanggal</span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar
+                    mode="single"
+                    selected={formData.event_tanggal}
+                    onSelect={(date) => {
+                      setFormData((prev) => ({ ...prev, event_tanggal: date }));
+                      setIsDirty(true);
+                    }}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="event_waktu">
+                Waktu Dimulai <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="event_waktu"
+                name="event_waktu"
+                type="time"
+                value={formData.event_waktu}
+                onChange={handleChange}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="event_batas_pendaftaran">
+                Batas Waktu Pendaftaran (Opsional)
+              </Label>
+              <Input
+                id="event_batas_pendaftaran"
+                name="event_batas_pendaftaran"
+                type="datetime-local"
+                value={
+                  formData.event_batas_pendaftaran
+                    ? format(
+                        formData.event_batas_pendaftaran,
+                        "yyyy-MM-dd'T'HH:mm",
+                      )
+                    : ""
+                }
+                onChange={(e) => {
+                  setFormData((prev) => ({
+                    ...prev,
+                    event_batas_pendaftaran: e.target.value
+                      ? new Date(e.target.value)
+                      : null,
+                  }));
+                  setIsDirty(true);
+                }}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="event_kuota">
+                Kuota Tim (Kosongkan jika bebas)
+              </Label>
+              <Input
+                id="event_kuota"
+                name="event_kuota"
+                type="number"
+                value={formData.event_kuota}
+                onChange={handleChange}
+                placeholder="Contoh: 30"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="event_kategori">
+                Kategori Peserta <span className="text-red-500">*</span>
+              </Label>
+              <Select
+                value={formData.event_kategori}
+                onValueChange={(value) => {
+                  setFormData((prev) => ({ ...prev, event_kategori: value }));
+                  setIsDirty(true);
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Pilih kategori" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="smp">SMP/Sederajat</SelectItem>
+                  <SelectItem value="sma_smk">SMA/Sederajat</SelectItem>
+                  <SelectItem value="mahasiswa">Mahasiswa</SelectItem>
+                  <SelectItem value="umum">Umum</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="event_tingkat">
+                Tingkat Skala <span className="text-red-500">*</span>
+              </Label>
+              <Select
+                value={formData.event_tingkat}
+                onValueChange={(value) => {
+                  setFormData((prev) => ({ ...prev, event_tingkat: value }));
+                  setIsDirty(true);
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Pilih tingkat" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="kota_kabupaten">Kota/Kabupaten</SelectItem>
+                  <SelectItem value="provinsi">Provinsi</SelectItem>
+                  <SelectItem value="nasional">Nasional</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="donasi_mulai">
+                Waktu Mulai E-Voting (Opsional)
+              </Label>
+              <Input
+                id="donasi_mulai"
+                name="donasi_mulai"
+                type="datetime-local"
+                value={
+                  formData.donasi_mulai
+                    ? format(formData.donasi_mulai, "yyyy-MM-dd'T'HH:mm")
+                    : ""
+                }
+                onChange={(e) => {
+                  setFormData((prev) => ({
+                    ...prev,
+                    donasi_mulai: e.target.value
+                      ? new Date(e.target.value)
+                      : null,
+                  }));
+                  setIsDirty(true);
+                }}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="donasi_selesai">
+                Waktu Berakhir E-Voting (Opsional)
+              </Label>
+              <Input
+                id="donasi_selesai"
+                name="donasi_selesai"
+                type="datetime-local"
+                value={
+                  formData.donasi_selesai
+                    ? format(formData.donasi_selesai, "yyyy-MM-dd'T'HH:mm")
+                    : ""
+                }
+                onChange={(e) => {
+                  setFormData((prev) => ({
+                    ...prev,
+                    donasi_selesai: e.target.value
+                      ? new Date(e.target.value)
+                      : null,
+                  }));
+                  setIsDirty(true);
+                }}
+              />
+            </div>
+          </div>
         </div>
-        <div className="grid md:grid-cols-2 gap-5">
-          <div className="space-y-2">
-            <Label htmlFor="event_tanggal">
-              Tanggal Pelaksanaan <span className="text-red-500">*</span>
-            </Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant={"outline"}
-                  className={cn(
-                    "w-full justify-start text-left font-normal",
-                    !formData.event_tanggal && "text-muted-foreground",
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {formData.event_tanggal ? (
-                    format(formData.event_tanggal, "PPP", { locale: id })
-                  ) : (
-                    <span>Pilih tanggal</span>
-                  )}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0">
-                <Calendar
-                  mode="single"
-                  selected={formData.event_tanggal}
-                  onSelect={(date) => {
-                    setFormData((prev) => ({ ...prev, event_tanggal: date }));
-                    setIsDirty(true);
-                  }}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="event_waktu">
-              Waktu Dimulai <span className="text-red-500">*</span>
-            </Label>
-            <Input
-              id="event_waktu"
-              name="event_waktu"
-              type="time"
-              value={formData.event_waktu}
-              onChange={handleChange}
-              required
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="event_batas_pendaftaran">
-              Tutup Pendaftaran (Opsional)
-            </Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant={"outline"}
-                  className={cn(
-                    "w-full justify-start text-left font-normal",
-                    !formData.event_batas_pendaftaran &&
-                      "text-muted-foreground",
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {formData.event_batas_pendaftaran ? (
-                    format(formData.event_batas_pendaftaran, "PPP", {
-                      locale: id,
-                    })
-                  ) : (
-                    <span>Pilih tanggal batas pendaftaran</span>
-                  )}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0">
-                <Calendar
-                  mode="single"
-                  selected={formData.event_batas_pendaftaran}
-                  onSelect={(date) => {
-                    setFormData((prev) => ({
-                      ...prev,
-                      event_batas_pendaftaran: date,
-                    }));
-                    setIsDirty(true);
-                  }}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="event_kuota">
-              Kuota Tim (Kosongkan jika bebas)
-            </Label>
-            <Input
-              id="event_kuota"
-              name="event_kuota"
-              type="number"
-              value={formData.event_kuota}
-              onChange={handleChange}
-              placeholder="Contoh: 30"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="event_kategori">
-              Kategori Peserta <span className="text-red-500">*</span>
-            </Label>
-            <Select
-              value={formData.event_kategori}
-              onValueChange={(value) => {
-                setFormData((prev) => ({ ...prev, event_kategori: value }));
-                setIsDirty(true);
-              }}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Pilih kategori" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="smp">SMP/Sederajat</SelectItem>
-                <SelectItem value="sma_smk">SMA/Sederajat</SelectItem>
-                <SelectItem value="mahasiswa">Mahasiswa</SelectItem>
-                <SelectItem value="umum">Umum</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="event_tingkat">
-              Tingkat Skala <span className="text-red-500">*</span>
-            </Label>
-            <Select
-              value={formData.event_tingkat}
-              onValueChange={(value) => {
-                setFormData((prev) => ({ ...prev, event_tingkat: value }));
-                setIsDirty(true);
-              }}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Pilih tingkat" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="kota_kabupaten">Kota/Kabupaten</SelectItem>
-                <SelectItem value="provinsi">Provinsi</SelectItem>
-                <SelectItem value="nasional">Nasional</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-      </div>
+      )}
 
       {/* ── SEKSI 4: KONTAK & PENGATURAN ── */}
-      <div className="space-y-5 bg-muted/20 p-5 md:p-6 rounded-2xl border border-border/50">
-        <div className="flex items-center gap-2 border-b pb-3">
-          <PhoneCall className="w-5 h-5 text-primary" />
-          <h3 className="font-semibold text-lg text-foreground">
-            Kontak & Publikasi
-          </h3>
-        </div>
-        <div className="grid md:grid-cols-2 gap-5">
-          <div className="space-y-2">
-            <Label htmlFor="event_contact_person_name">
-              Nama Contact Person (Opsional)
-            </Label>
-            <Input
-              id="event_contact_person_name"
-              name="event_contact_person_name"
-              value={formData.event_contact_person_name}
-              onChange={handleChange}
-              placeholder="Contoh: Budi Santoso"
-            />
+      {(isEditMode || step === 4) && (
+        <div className="space-y-5 bg-muted/20 p-5 md:p-6 rounded-2xl border border-border/50">
+          <div className="flex items-center gap-2 border-b pb-3">
+            <PhoneCall className="w-5 h-5 text-primary" />
+            <h3 className="font-semibold text-lg text-foreground">
+              Kontak & Publikasi
+            </h3>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="event_contact_person_number">
-              No. WA Contact Person (Opsional)
-            </Label>
-            <Input
-              id="event_contact_person_number"
-              name="event_contact_person_number"
-              value={formData.event_contact_person_number}
-              onChange={handleChange}
-              placeholder="Contoh: 081234567890"
-            />
-          </div>
-          {event && (
+          <div className="grid md:grid-cols-2 gap-5">
             <div className="space-y-2">
-              <Label htmlFor="event_status">
-                Status Publikasi <span className="text-red-500">*</span>
+              <Label htmlFor="event_contact_person_name">
+                Nama Contact Person (Opsional)
               </Label>
+              <Input
+                id="event_contact_person_name"
+                name="event_contact_person_name"
+                value={formData.event_contact_person_name}
+                onChange={handleChange}
+                placeholder="Contoh: Budi Santoso"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="event_contact_person_number">
+                No. WA Contact Person (Opsional)
+              </Label>
+              <Input
+                id="event_contact_person_number"
+                name="event_contact_person_number"
+                value={formData.event_contact_person_number}
+                onChange={handleChange}
+                placeholder="Contoh: 081234567890"
+              />
+            </div>
+            {event && (
+              <div className="space-y-2">
+                <Label htmlFor="event_status">
+                  Status Publikasi <span className="text-red-500">*</span>
+                </Label>
+                <Select
+                  value={formData.event_status}
+                  onValueChange={(value) => {
+                    setFormData((prev) => ({ ...prev, event_status: value }));
+                    setIsDirty(true);
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Pilih status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="draft">Draft</SelectItem>
+                    <SelectItem value="published">Published</SelectItem>
+                    <SelectItem value="archived">Archived</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label htmlFor="is_result_show">Tampilkan Hasil Klasemen</Label>
               <Select
-                value={formData.event_status}
+                value={formData.is_result_show ? "true" : "false"}
                 onValueChange={(value) => {
-                  setFormData((prev) => ({ ...prev, event_status: value }));
+                  setFormData((prev) => ({
+                    ...prev,
+                    is_result_show: value === "true",
+                  }));
                   setIsDirty(true);
                 }}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Pilih status" />
+                  <SelectValue placeholder="Pilih..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="draft">Draft</SelectItem>
-                  <SelectItem value="published">Published</SelectItem>
-                  <SelectItem value="archived">Archived</SelectItem>
+                  <SelectItem value="false">Sembunyikan</SelectItem>
+                  <SelectItem value="true">Tampilkan</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-          )}
-          {(user?.role === "admin" || user?.role === "superadmin") && (
-            <div className="space-y-2">
-              <Label htmlFor="koordinator_id">
-                Pilih Koordinator Event <span className="text-red-500">*</span>
-              </Label>
-              <Select
-                value={formData.koordinator_id}
-                onValueChange={(value) => {
-                  setFormData((prev) => ({ ...prev, koordinator_id: value }));
-                  setIsDirty(true);
-                }}
-                required
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Pilih Koordinator" />
-                </SelectTrigger>
-                <SelectContent>
-                  {coordinators.map((c) => (
-                    <SelectItem key={c.user_id} value={c.user_id}>
-                      {c.user_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            {(user?.role === "admin" || user?.role === "superadmin") && (
+              <div className="space-y-2">
+                <Label htmlFor="koordinator_id">
+                  Pilih Koordinator Event{" "}
+                  <span className="text-red-500">*</span>
+                </Label>
+                <Popover
+                  open={openKoordinator}
+                  onOpenChange={setOpenKoordinator}
+                >
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={openKoordinator}
+                      className={cn(
+                        "w-full justify-between font-normal",
+                        !formData.koordinator_id && "text-muted-foreground",
+                      )}
+                    >
+                      <span className="truncate">
+                        {formData.koordinator_id
+                          ? coordinators.find(
+                              (c) => c.user_id === formData.koordinator_id,
+                            )?.user_name
+                          : "Pilih Koordinator"}
+                      </span>
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    className="w-[var(--radix-popover-trigger-width)] p-0"
+                    align="start"
+                  >
+                    <div className="flex flex-col">
+                      <div className="p-2 border-b">
+                        <Input
+                          placeholder="Cari koordinator..."
+                          value={searchKoordinator}
+                          onChange={(e) => setSearchKoordinator(e.target.value)}
+                          className="h-8"
+                        />
+                      </div>
+                      <div className="max-h-60 overflow-y-auto p-1">
+                        {filteredCoordinators.length > 0 ? (
+                          filteredCoordinators.map((c) => (
+                            <Button
+                              key={c.user_id}
+                              variant="ghost"
+                              className="w-full justify-start font-normal"
+                              onClick={() => {
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  koordinator_id: c.user_id,
+                                }));
+                                setIsDirty(true);
+                                setOpenKoordinator(false);
+                                setSearchKoordinator("");
+                              }}
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4 shrink-0",
+                                  formData.koordinator_id === c.user_id
+                                    ? "opacity-100"
+                                    : "opacity-0",
+                                )}
+                              />
+                              {c.user_name}
+                            </Button>
+                          ))
+                        ) : (
+                          <div className="py-6 text-center text-sm text-muted-foreground">
+                            Tidak ditemukan.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              </div>
+            )}
+            <div className="space-y-2 md:col-span-2 pt-2 mt-2 border-t border-border/50">
+              <Label>Template Penamaan Kejuaraan (Opsional)</Label>
+              <p className="text-xs text-muted-foreground mb-2">
+                Kosongkan untuk menggunakan standar bawaan. Tambahkan berurutan
+                dari blok peringkat teratas (Misal: UTAMA, HARAPAN, MADYA).
+                Setiap 1 blok mewakili 3 peringkat. Jika item urutan paling
+                akhir tidak dicentang "Beri Nomor", maka namanya akan otomatis
+                diterapkan untuk SEMUA sisa peringkat.
+              </p>
+              <div className="flex flex-col sm:flex-row items-center gap-2 mb-2">
+                <Input
+                  value={newTemplateInput}
+                  onChange={(e) => setNewTemplateInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleAddTemplate();
+                    }
+                  }}
+                  placeholder="Ketik lalu enter, contoh: BINA"
+                />
+                <div className="flex items-center gap-2 border rounded-md px-3 py-2 bg-background h-10 w-full sm:w-auto shrink-0">
+                  <input
+                    type="checkbox"
+                    id="form-numbered-checkbox"
+                    checked={newTemplateNumbered}
+                    onChange={(e) => setNewTemplateNumbered(e.target.checked)}
+                    className="rounded border-gray-300"
+                  />
+                  <Label
+                    htmlFor="form-numbered-checkbox"
+                    className="text-sm cursor-pointer whitespace-nowrap"
+                  >
+                    Beri Nomor (1-3)
+                  </Label>
+                </div>
+                <Button
+                  type="button"
+                  onClick={handleAddTemplate}
+                  variant="secondary"
+                  className="w-full sm:w-auto shrink-0"
+                >
+                  Tambah
+                </Button>
+              </div>
+              {kejuaraanTemplate.length > 0 && (
+                <div className="flex flex-col gap-2 mt-3 p-3 bg-muted/5 border rounded-xl max-h-60 overflow-y-auto scrollbar-thin">
+                  {kejuaraanTemplate.map((item, idx) => {
+                    const startRank = idx * 3 + 1;
+                    const isLastAndUnnumbered =
+                      !item.numbered && idx === kejuaraanTemplate.length - 1;
+                    return (
+                      <div
+                        key={idx}
+                        className="flex items-center justify-between p-3 bg-background border rounded-lg shadow-sm transition-colors hover:border-purple-300 dark:hover:border-purple-700"
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="flex items-center justify-center w-7 h-7 mt-0.5 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 font-bold text-xs shrink-0">
+                            {idx + 1}
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="font-semibold text-sm">
+                              {item.name}
+                            </span>
+                            <span className="text-xs text-muted-foreground mb-1.5">
+                              {item.numbered
+                                ? "Diberi Nomor (1-3)"
+                                : isLastAndUnnumbered
+                                  ? "Tanpa Nomor (Penyapu Sisa)"
+                                  : "Tanpa Nomor (Tetap 3 Peringkat)"}
+                            </span>
+                            <div className="flex flex-wrap gap-1.5">
+                              {item.numbered ? (
+                                <>
+                                  <Badge
+                                    variant="outline"
+                                    className="text-[10px] py-0 h-5 font-normal bg-muted/30 text-muted-foreground"
+                                  >
+                                    Peringkat {startRank}:{" "}
+                                    <strong className="text-foreground ml-1">
+                                      {item.name} 1
+                                    </strong>
+                                  </Badge>
+                                  <Badge
+                                    variant="outline"
+                                    className="text-[10px] py-0 h-5 font-normal bg-muted/30 text-muted-foreground"
+                                  >
+                                    Peringkat {startRank + 1}:{" "}
+                                    <strong className="text-foreground ml-1">
+                                      {item.name} 2
+                                    </strong>
+                                  </Badge>
+                                  <Badge
+                                    variant="outline"
+                                    className="text-[10px] py-0 h-5 font-normal bg-muted/30 text-muted-foreground"
+                                  >
+                                    Peringkat {startRank + 2}:{" "}
+                                    <strong className="text-foreground ml-1">
+                                      {item.name} 3
+                                    </strong>
+                                  </Badge>
+                                </>
+                              ) : isLastAndUnnumbered ? (
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px] py-0 h-5 font-normal bg-muted/30 text-muted-foreground"
+                                >
+                                  Peringkat {startRank} dst:{" "}
+                                  <strong className="text-foreground ml-1">
+                                    {item.name}
+                                  </strong>
+                                </Badge>
+                              ) : (
+                                <>
+                                  <Badge
+                                    variant="outline"
+                                    className="text-[10px] py-0 h-5 font-normal bg-muted/30 text-muted-foreground"
+                                  >
+                                    Peringkat {startRank}:{" "}
+                                    <strong className="text-foreground ml-1">
+                                      {item.name}
+                                    </strong>
+                                  </Badge>
+                                  <Badge
+                                    variant="outline"
+                                    className="text-[10px] py-0 h-5 font-normal bg-muted/30 text-muted-foreground"
+                                  >
+                                    Peringkat {startRank + 1}:{" "}
+                                    <strong className="text-foreground ml-1">
+                                      {item.name}
+                                    </strong>
+                                  </Badge>
+                                  <Badge
+                                    variant="outline"
+                                    className="text-[10px] py-0 h-5 font-normal bg-muted/30 text-muted-foreground"
+                                  >
+                                    Peringkat {startRank + 2}:{" "}
+                                    <strong className="text-foreground ml-1">
+                                      {item.name}
+                                    </strong>
+                                  </Badge>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          onClick={() => handleRemoveTemplate(idx)}
+                          className="text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 shrink-0 h-8 w-8 ml-2"
+                          title="Hapus template ini"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-          )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* ── SEKSI 5: BERKAS PENDUKUNG ── */}
-      <div className="space-y-5 bg-muted/20 p-5 md:p-6 rounded-2xl border border-border/50">
-        <div className="flex items-center gap-2 border-b pb-3">
-          <ImageIcon className="w-5 h-5 text-primary" />
-          <h3 className="font-semibold text-lg text-foreground">
-            Berkas Pendukung
-          </h3>
-        </div>
-        <div className="grid md:grid-cols-2 gap-6">
-          <div className="space-y-2">
-            <Label htmlFor="event_poster">Poster Event (Opsional)</Label>
-            <div className="flex items-center gap-4">
-              {posterPreview && (
-                <Image
-                  src={posterPreview}
-                  alt="Pratinjau Poster"
-                  width={60}
-                  height={84}
-                  className="rounded-md border object-cover p-1 bg-white"
-                />
-              )}
-              <div className="flex-1 flex items-center gap-2">
+      {(isEditMode || step === 5) && (
+        <div className="space-y-5 bg-muted/20 p-5 md:p-6 rounded-2xl border border-border/50">
+          <div className="flex items-center gap-2 border-b pb-3">
+            <ImageIcon className="w-5 h-5 text-primary" />
+            <h3 className="font-semibold text-lg text-foreground">
+              Berkas Pendukung
+            </h3>
+          </div>
+          <div className="grid md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <Label htmlFor="event_poster">Poster Event (Opsional)</Label>
+              <div className="flex items-center gap-4">
+                {posterPreview && (
+                  <Image
+                    src={posterPreview}
+                    alt="Pratinjau Poster"
+                    width={60}
+                    height={84}
+                    className="rounded-md border object-cover p-1 bg-white"
+                  />
+                )}
+                <div className="flex-1 flex items-center gap-2">
+                  <Input
+                    id="event_poster"
+                    name="event_poster"
+                    type="file"
+                    onChange={handlePosterChange}
+                    className="flex-1"
+                    accept="image/*"
+                    ref={posterInputRef}
+                  />
+                  {poster && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={handleRemovePoster}
+                      title="Batal pilih poster"
+                    >
+                      <X className="h-4 w-4 text-red-500" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="event_juknis">
+                Petunjuk Teknis / Juknis (PDF/Doc)
+              </Label>
+              <div className="flex items-center gap-2">
                 <Input
-                  id="event_poster"
-                  name="event_poster"
+                  id="event_juknis"
+                  name="event_juknis"
                   type="file"
-                  onChange={handlePosterChange}
+                  onChange={handleJuknisChange}
                   className="flex-1"
-                  accept="image/*"
-                  ref={posterInputRef}
+                  accept=".pdf,.doc,.docx"
+                  ref={juknisInputRef}
                 />
-                {poster && (
+                {juknis && (
                   <Button
                     type="button"
                     variant="ghost"
                     size="icon"
-                    onClick={handleRemovePoster}
-                    title="Batal pilih poster"
+                    onClick={handleRemoveJuknis}
+                    title="Batal pilih juknis"
                   >
                     <X className="h-4 w-4 text-red-500" />
                   </Button>
                 )}
               </div>
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="event_juknis">
-              Petunjuk Teknis / Juknis (PDF/Doc)
-            </Label>
-            <div className="flex items-center gap-2">
-              <Input
-                id="event_juknis"
-                name="event_juknis"
-                type="file"
-                onChange={handleJuknisChange}
-                className="flex-1"
-                accept=".pdf,.doc,.docx"
-                ref={juknisInputRef}
-              />
-              {juknis && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleRemoveJuknis}
-                  title="Batal pilih juknis"
-                >
-                  <X className="h-4 w-4 text-red-500" />
-                </Button>
+              {juknisName && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  File saat ini:{" "}
+                  <span className="font-medium text-primary bg-primary/10 px-2 py-0.5 rounded">
+                    {juknisName.split("/").pop()}
+                  </span>
+                </p>
               )}
             </div>
-            {juknisName && (
-              <p className="text-xs text-muted-foreground mt-1">
-                File saat ini:{" "}
-                <span className="font-medium text-primary bg-primary/10 px-2 py-0.5 rounded">
-                  {juknisName.split("/").pop()}
-                </span>
-              </p>
-            )}
           </div>
         </div>
-      </div>
+      )}
 
       {/* ── FOOTER TOMBOL SIMPAN ── */}
       <div className="flex flex-col sm:flex-row justify-end gap-3 pt-6 border-t mt-8">
@@ -730,29 +1357,50 @@ const EventForm = ({
         >
           Batal
         </Button>
-        <Button
-          type="submit"
-          variant="secondary"
-          onClick={() => setSubmitStatus("draft")}
-          disabled={isSubmitting}
-        >
-          Simpan sebagai Draft
-        </Button>
-        <Button
-          type="submit"
-          onClick={() => setSubmitStatus("published")}
-          disabled={isSubmitting}
-        >
-          {event && formData.event_status === "archived"
-            ? "Simpan Perubahan"
-            : "Simpan & Publish"}
-        </Button>
+
+        {!isEditMode && step > 1 && (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handlePrevStep}
+            disabled={isSubmitting}
+          >
+            Kembali
+          </Button>
+        )}
+
+        {!isEditMode && step < 5 ? (
+          <Button type="button" onClick={handleNextStep}>
+            Selanjutnya
+          </Button>
+        ) : (
+          <>
+            <Button
+              type="submit"
+              variant="secondary"
+              onClick={() => setSubmitStatus("draft")}
+              disabled={isSubmitting}
+            >
+              Simpan sebagai Draft
+            </Button>
+            <Button
+              type="submit"
+              onClick={() => setSubmitStatus("published")}
+              disabled={isSubmitting}
+            >
+              {isEditMode && formData.event_status === "archived"
+                ? "Simpan Perubahan"
+                : "Simpan & Publish"}
+            </Button>
+          </>
+        )}
       </div>
     </form>
   );
 };
 
 export default function EventManagementPage() {
+  const router = useRouter();
   const { user } = useAuth();
   const [events, setEvents] = useState([]);
   const [coordinators, setCoordinators] = useState([]);
@@ -763,11 +1411,36 @@ export default function EventManagementPage() {
   const [isDirty, setIsDirty] = useState(false);
   const [isCancelAlertOpen, setIsCancelAlertOpen] = useState(false);
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const [eventsPerPage, setEventsPerPage] = useState(10);
+  const [totalEvents, setTotalEvents] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+      setCurrentPage(1);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const eventsRes = await api.get("/events");
+      const params = new URLSearchParams({
+        page: currentPage,
+        limit: eventsPerPage,
+      });
+      if (debouncedSearch) params.append("search", debouncedSearch);
+
+      const eventsRes = await api.get(`/events?${params.toString()}`);
+
       setEvents(eventsRes.data.events);
+      setTotalEvents(eventsRes.data.totalItems || 0);
+      setTotalPages(eventsRes.data.totalPages || 0);
 
       if (user?.role === "admin" || user?.role === "superadmin") {
         const usersRes = await api.get("/users");
@@ -780,7 +1453,7 @@ export default function EventManagementPage() {
     } finally {
       setLoading(false);
     }
-  }, [user?.role]);
+  }, [user?.role, currentPage, eventsPerPage, debouncedSearch]);
 
   useEffect(() => {
     if (user) {
@@ -894,14 +1567,31 @@ export default function EventManagementPage() {
       </header>
 
       <main className="flex flex-1 flex-col gap-4 p-4 pt-0">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-semibold">Daftar Event</h1>
-          {user?.role !== "juri" && (
-            <Button onClick={() => openDialog()}>
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Tambah Event
-            </Button>
-          )}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Daftar Event</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Kelola jadwal, pendaftaran, dan pelaksanaan event.
+            </p>
+          </div>
+          <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+            <div className="relative w-full sm:w-64">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="search"
+                placeholder="Cari nama atau tempat..."
+                className="w-full bg-background pl-9"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+            {user?.role !== "juri" && (
+              <Button className="w-full sm:w-auto" onClick={() => openDialog()}>
+                <PlusCircle className="mr-2 h-4 w-4" />
+                Tambah Event
+              </Button>
+            )}
+          </div>
         </div>
 
         <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
@@ -927,7 +1617,17 @@ export default function EventManagementPage() {
                 events.map((event) => (
                   <TableRow
                     key={event.event_id}
-                    className="hover:bg-muted/40 transition-colors group"
+                    className="hover:bg-muted/40 transition-colors group cursor-pointer"
+                    onClick={(e) => {
+                      if (
+                        e.target.closest("button") ||
+                        e.target.closest('[role="menu"]') ||
+                        e.target.closest('[role="menuitem"]')
+                      ) {
+                        return;
+                      }
+                      router.push(`/admin/events/${event.event_id}`);
+                    }}
                   >
                     <TableCell>
                       <div className="flex items-center gap-4">
@@ -1065,6 +1765,58 @@ export default function EventManagementPage() {
             </TableBody>
           </Table>
         </div>
+
+        {totalPages > 0 && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-4">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Tampilkan</span>
+              <Select
+                value={eventsPerPage.toString()}
+                onValueChange={(val) => {
+                  setEventsPerPage(Number(val));
+                  setCurrentPage(1);
+                }}
+              >
+                <SelectTrigger className="w-[70px] h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="10">10</SelectItem>
+                  <SelectItem value="25">25</SelectItem>
+                  <SelectItem value="50">50</SelectItem>
+                  <SelectItem value="100">100</SelectItem>
+                </SelectContent>
+              </Select>
+              <span className="text-sm text-muted-foreground">
+                dari {totalEvents} event
+              </span>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+              >
+                <ChevronLeft className="h-4 w-4 mr-1" /> Prev
+              </Button>
+              <span className="text-sm font-medium mx-2">
+                Halaman {currentPage} dari {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+                }
+                disabled={currentPage === totalPages}
+              >
+                Next <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
+            </div>
+          </div>
+        )}
       </main>
 
       {/* Dialog untuk Tambah/Edit Event akan ditempatkan di sini */}
@@ -1151,7 +1903,7 @@ export default function EventManagementPage() {
           <AlertDialogFooter>
             <AlertDialogCancel>Kembali ke Form</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="bg-destructive text-white hover:bg-destructive/90"
               onClick={() => {
                 setIsCancelAlertOpen(false);
                 setIsDirty(false);

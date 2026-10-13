@@ -53,9 +53,16 @@ export default function InputPenilaianPage() {
     if (!user) return;
     setLoading(true);
     try {
-      // Endpoint ini perlu dibuat di backend untuk mengambil event khusus juri
-      const response = await api.get(`/events/juri`);
-      setEvents(response.data.events);
+      const endpoint =
+        user.role === "asisten_juri" ? "/events" : "/events/juri";
+      const response = await api.get(endpoint);
+      let eventsList = response.data.events;
+      if (user.role === "asisten_juri") {
+        eventsList = eventsList.filter((e) =>
+          e.Event_asistens?.some((a) => a.asisten_id === user.id),
+        );
+      }
+      setEvents(eventsList);
     } catch (error) {
       toast.error("Gagal memuat daftar event Anda.");
     } finally {

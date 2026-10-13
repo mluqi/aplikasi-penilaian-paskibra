@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react";
 import api from "@/service/api";
 import { toast } from "sonner";
 import {
@@ -47,13 +53,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
   ArrowLeft,
   ArrowRight,
   Frown,
@@ -63,17 +62,19 @@ import {
   Search,
   MapPin,
   CalendarIcon,
+  Printer,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import useAuth from "@/hooks/useAuth";
 import { format } from "date-fns";
 import { id } from "date-fns/locale";
 import { Input } from "@/components/ui/input";
 import Image from "next/image";
+import { useReactToPrint } from "react-to-print";
 
 // --- Komponen Detail Penilaian untuk Accordion ---
 const JuriScoreCard = ({ penilaian, onUnlockSuccess }) => (
-  <Card className="mb-4">
+  <Card className="mb-4 print:shadow-none print:border-gray-300 print:break-inside-avoid print:mb-6">
     <CardHeader className="flex flex-row items-center gap-4 space-y-0">
       <Avatar className="h-10 w-10">
         <AvatarImage
@@ -86,15 +87,22 @@ const JuriScoreCard = ({ penilaian, onUnlockSuccess }) => (
         <AvatarFallback>{penilaian.User.user_name.charAt(0)}</AvatarFallback>
       </Avatar>
       <div className="flex-1">
-        <p className="font-semibold">{penilaian.User.user_name}</p>
-        <p className="text-xs text-muted-foreground">
+        <p className="font-semibold print:text-black">
+          {penilaian.User.user_name}
+        </p>
+        {penilaian.Asisten && (
+          <p className="text-[10px] text-amber-600 dark:text-amber-500 font-semibold uppercase tracking-wider mb-1 mt-0.5">
+            Diinput oleh Asisten: {penilaian.Asisten.user_name}
+          </p>
+        )}
+        <p className="text-xs text-muted-foreground print:text-gray-600">
           Total Nilai:{" "}
-          <span className="font-bold text-foreground">
-            {parseFloat(penilaian.total_nilai).toFixed(2)}
+          <span className="font-bold text-foreground print:text-black">
+            {parseInt(penilaian.total_nilai, 10)}
           </span>
         </p>
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 print:hidden">
         {penilaian.is_lock ? (
           <Badge variant="destructive" className="flex items-center gap-1">
             <Lock className="h-3 w-3" /> Terkunci
@@ -117,16 +125,20 @@ const JuriScoreCard = ({ penilaian, onUnlockSuccess }) => (
     </CardHeader>
     <CardContent>
       {penilaian.catatan && (
-        <blockquote className="mt-2 border-l-2 pl-4 italic text-sm">
+        <blockquote className="mt-2 border-l-2 pl-4 italic text-sm print:text-gray-800 print:border-gray-400">
           "{penilaian.catatan}"
         </blockquote>
       )}
-      <Table className="mt-4">
-        <TableHeader>
+      <Table className="mt-4 print:border print:border-gray-300">
+        <TableHeader className="print:bg-gray-100">
           <TableRow>
-            <TableHead>Aspek</TableHead>
-            <TableHead>Sub-Aspek</TableHead>
-            <TableHead className="text-right">Nilai</TableHead>
+            <TableHead className="print:text-black font-bold">Aspek</TableHead>
+            <TableHead className="print:text-black font-bold">
+              Sub-Aspek
+            </TableHead>
+            <TableHead className="text-right print:text-black font-bold">
+              Nilai
+            </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -136,18 +148,24 @@ const JuriScoreCard = ({ penilaian, onUnlockSuccess }) => (
                 {subIndex === 0 && (
                   <TableCell
                     rowSpan={aspekNilai.SubAspekNilais.length}
-                    className="font-semibold align-top"
+                    className="font-semibold align-top print:border-r print:border-gray-300 print:bg-gray-50/50"
                   >
-                    <p>{aspekNilai.Aspek.nama_aspek}</p>
-                    <p className="text-xs font-normal text-muted-foreground">
+                    <p className="print:text-black">
+                      {aspekNilai.Aspek.nama_aspek}
+                    </p>
+                    <p className="text-xs font-normal text-muted-foreground print:text-gray-600">
                       Nilai Aspek:{" "}
-                      {parseFloat(aspekNilai.nilai_aspek).toFixed(2)}
+                      <span className="font-bold print:text-black">
+                        {parseInt(aspekNilai.nilai_aspek, 10)}
+                      </span>
                     </p>
                   </TableCell>
                 )}
-                <TableCell>{subNilai.SubAspek.nama_subaspek}</TableCell>
-                <TableCell className="text-right font-mono">
-                  {parseFloat(subNilai.nilai).toFixed(2)}
+                <TableCell className="print:text-black print:border-b print:border-gray-200">
+                  {subNilai.SubAspek.nama_subaspek}
+                </TableCell>
+                <TableCell className="text-right font-mono print:text-black print:border-b print:border-gray-200">
+                  {parseInt(subNilai.nilai, 10)}
                 </TableCell>
               </TableRow>
             )),
@@ -215,7 +233,12 @@ const TeamDetailAccordion = ({ team, eventId, onDataUpdate }) => {
               key={penilaian.penilaian_id}
               penilaian={penilaian}
               onUnlockSuccess={
-                user?.role === "admin" || user?.role === "superadmin"
+                [
+                  "admin",
+                  "superadmin",
+                  "koordinator_event",
+                  "asisten_juri",
+                ].includes(user?.role)
                   ? handleUnlock
                   : undefined
               }
@@ -234,6 +257,8 @@ const TeamDetailAccordion = ({ team, eventId, onDataUpdate }) => {
 const RekapNilaiPage = () => {
   const { user } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
   const [events, setEvents] = useState([]);
   const [activeEvent, setActiveEvent] = useState(null); // Untuk view Juri
   const [rekapData, setRekapData] = useState({
@@ -246,12 +271,47 @@ const RekapNilaiPage = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [availableYears, setAvailableYears] = useState([]);
 
-  const [viewingTeamDetails, setViewingTeamDetails] = useState(null); // State untuk dialog detail
   const [rekapVersion, setRekapVersion] = useState(0); // Untuk memicu re-fetch
   const [loading, setLoading] = useState(true);
 
   const isJuriView = user?.role === "juri";
-  const isAdminView = ["admin", "superadmin"].includes(user?.role);
+  const isAdminView = ["admin", "superadmin", "asisten_juri"].includes(
+    user?.role,
+  );
+
+  const printTableRef = useRef();
+  const handlePrintTable = useReactToPrint({
+    contentRef: printTableRef,
+    documentTitle: `Rekap_Nilai_Keseluruhan_${activeEvent?.event_name?.replace(/\s+/g, "_") || "Event"}`,
+    pageStyle:
+      "@page { size: A4 landscape; margin: 10mm; } @media print { body { -webkit-print-color-adjust: exact; } }",
+  });
+
+  const handleSetActiveEvent = (event) => {
+    setActiveEvent(event);
+    const params = new URLSearchParams(searchParams.toString());
+    if (event) {
+      params.set("event", event.event_id);
+    } else {
+      params.delete("event");
+    }
+    router.push(`${pathname}?${params.toString()}`);
+  };
+
+  useEffect(() => {
+    const eventIdFromUrl = searchParams.get("event");
+    if (eventIdFromUrl) {
+      if (
+        events.length > 0 &&
+        (!activeEvent || activeEvent.event_id !== eventIdFromUrl)
+      ) {
+        const foundEvent = events.find((e) => e.event_id === eventIdFromUrl);
+        if (foundEvent) setActiveEvent(foundEvent);
+      }
+    } else if (activeEvent) {
+      setActiveEvent(null);
+    }
+  }, [events, searchParams, activeEvent]);
 
   useEffect(() => {
     if (user?.role === "koordinator_team") {
@@ -324,7 +384,6 @@ const RekapNilaiPage = () => {
           rekap: [],
           aspeks: [],
           teams: [],
-          details: {},
         });
       } finally {
         setLoading(false);
@@ -363,6 +422,10 @@ const RekapNilaiPage = () => {
     }
     return [];
   }, [rekapData]);
+
+  const handleViewTeamDetails = (team) => {
+    router.push(`/admin/rekap/${activeEvent.event_id}/detail/${team.team_id}`);
+  };
   // Jangan render apapun jika sedang proses redirect
   if (user?.role === "koordinator_team" || user?.role === "koordinator_event") {
     return (
@@ -433,13 +496,23 @@ const RekapNilaiPage = () => {
                     </div>
                   </div>
                 </div>
-                <Button
-                  variant="outline"
-                  onClick={() => setActiveEvent(null)}
-                  className="w-full md:w-auto shadow-sm shrink-0"
-                >
-                  <ArrowLeft className="mr-2 h-4 w-4" /> Ganti Event
-                </Button>
+                <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto shrink-0">
+                  <Button
+                    variant="outline"
+                    onClick={() => handleSetActiveEvent(null)}
+                    className="w-full sm:w-auto shadow-sm"
+                  >
+                    <ArrowLeft className="mr-2 h-4 w-4" /> Ganti Event
+                  </Button>
+                  {isAdminView && (
+                    <Button
+                      onClick={handlePrintTable}
+                      className="w-full sm:w-auto shadow-sm"
+                    >
+                      <Printer className="mr-2 h-4 w-4" /> Cetak Rekap
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -470,67 +543,85 @@ const RekapNilaiPage = () => {
 
             {/* Tampilan Detail untuk Admin */}
             {isAdminView && (
-              <>
-                <div className="rounded-lg border">
-                  <Table>
-                    <TableHeader>
+              <div
+                ref={printTableRef}
+                className="print:p-2 print:bg-white print:text-black print:w-full"
+              >
+                <div className="hidden print:block mb-6 text-center border-b pb-4 border-gray-300">
+                  <h1 className="text-2xl font-bold">
+                    Rekap Nilai Keseluruhan
+                  </h1>
+                  <h2 className="text-lg text-gray-700">
+                    Event: {activeEvent.event_name}
+                  </h2>
+                </div>
+                <div className="rounded-lg border print:border-none print:shadow-none">
+                  <Table className="print:border-collapse print:w-full print:border print:border-gray-300">
+                    <TableHeader className="print:bg-gray-100">
                       <TableRow>
-                        <TableHead className="text-center">Peringkat</TableHead>
-                        <TableHead>Nama Tim</TableHead>
+                        <TableHead className="text-center w-24 print:border print:border-gray-300 print:text-black font-bold print:p-2 print:text-sm print:h-auto">
+                          No. Tampil
+                        </TableHead>
+                        <TableHead className="print:border print:border-gray-300 print:text-black font-bold print:p-2 print:text-sm print:h-auto">
+                          Nama Tim
+                        </TableHead>
                         {rekapData.aspeks?.map((k) => (
-                          <TableHead key={k} className="text-center">
+                          <TableHead
+                            key={k}
+                            className="text-center print:border print:border-gray-300 print:text-black font-bold print:p-2 print:text-sm print:h-auto"
+                          >
                             {k}
                           </TableHead>
                         ))}
-                        <TableHead className="text-center font-bold">
-                          Total
-                        </TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {loading ? (
                         <TableRow>
                           <TableCell
-                            colSpan={rekapData.aspeks?.length + 3}
+                            colSpan={(rekapData.aspeks?.length || 0) + 2}
                             className="h-24 text-center"
                           >
                             Memuat data...
                           </TableCell>
                         </TableRow>
                       ) : rekapData.rekap?.length > 0 ? (
-                        rekapData.rekap.map((s) => (
+                        rekapData.rekap.map((s, index) => (
                           <TableRow
                             key={s.team_id}
-                            onClick={() =>
-                              setViewingTeamDetails(
-                                rekapData.details?.[s.team_id],
-                              )
-                            }
-                            className="cursor-pointer hover:bg-muted/50"
+                            onClick={() => handleViewTeamDetails(s)}
+                            className="cursor-pointer hover:bg-muted/50 print:break-inside-avoid"
                           >
-                            <TableCell className="text-center font-bold text-lg">
-                              {s.rank}
+                            <TableCell className="text-center font-bold text-lg print:border print:border-gray-300 print:text-black print:text-sm print:p-1.5">
+                              {" "}
+                              {s.nomor_tampil
+                                ? String(s.nomor_tampil).padStart(2, "0")
+                                : index + 1}
                             </TableCell>
-                            <TableCell className="font-medium">
-                              <p>{s.team_name}</p>
-                              <p className="text-sm text-muted-foreground font-normal">
+                            <TableCell className="font-medium print:border print:border-gray-300 print:text-black print:p-1.5">
+                              <p className="print:text-sm font-bold">
+                                {s.team_name}
+                              </p>
+                              <p className="text-sm text-muted-foreground font-normal print:text-gray-600 print:text-xs mt-0.5">
+                                {" "}
                                 {s.team_sekolah_instansi}
                               </p>
                             </TableCell>
                             {rekapData.aspeks.map((k) => (
-                              <TableCell key={k} className="text-center">
-                                {s.scores[k]?.toFixed(2) || "0.00"}
+                              <TableCell
+                                key={k}
+                                className="text-center print:border print:border-gray-300 print:text-black print:p-1.5 print:text-sm font-semibold"
+                              >
+                                {" "}
+                                {s.scores[k] || "0"}
                               </TableCell>
                             ))}
-                            <TableCell className="text-center font-semibold">
-                              {s.total.toFixed(2)}
-                            </TableCell>
                           </TableRow>
                         ))
                       ) : (
                         <TableRow>
                           <TableCell
-                            colSpan={rekapData.aspeks?.length + 3}
+                            colSpan={(rekapData.aspeks?.length || 0) + 2}
                             className="h-24 text-center"
                           >
                             Belum ada penilaian yang masuk.
@@ -540,60 +631,8 @@ const RekapNilaiPage = () => {
                     </TableBody>
                   </Table>
                 </div>
-              </>
+              </div>
             )}
-
-            {/* Dialog untuk menampilkan detail penilaian per juri */}
-            <Dialog
-              open={!!viewingTeamDetails}
-              onOpenChange={(isOpen) => !isOpen && setViewingTeamDetails(null)}
-            >
-              <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
-                <DialogHeader>
-                  <DialogTitle>
-                    Detail Penilaian: {viewingTeamDetails?.[0]?.Team?.team_name}
-                  </DialogTitle>
-                  <DialogDescription>
-                    Rincian skor yang diberikan oleh setiap juri untuk tim ini.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="flex-1 overflow-y-auto pr-2 -mr-4 space-y-4">
-                  {viewingTeamDetails?.length > 0 ? (
-                    viewingTeamDetails.map((penilaian) => (
-                      <JuriScoreCard
-                        onUnlockSuccess={async (penilaianId) => {
-                          try {
-                            const response = await api.patch(
-                              `/penilaian/unlock/${penilaianId}`,
-                            );
-                            toast.success(response.data.message);
-                            // Perbarui state dialog secara lokal
-                            setViewingTeamDetails((prev) =>
-                              prev.map((p) =>
-                                p.penilaian_id === penilaianId
-                                  ? { ...p, is_lock: false }
-                                  : p,
-                              ),
-                            );
-                            // Memicu re-fetch data di latar belakang
-                            setRekapVersion((v) => v + 1);
-                          } catch (error) {
-                            toast.error(
-                              error.response?.data?.message ||
-                                "Gagal membuka kunci.",
-                            );
-                          }
-                        }}
-                        key={penilaian.penilaian_id}
-                        penilaian={penilaian}
-                      />
-                    ))
-                  ) : (
-                    <p>Detail tidak tersedia.</p>
-                  )}
-                </div>
-              </DialogContent>
-            </Dialog>
           </>
         ) : (
           <>
@@ -730,7 +769,7 @@ const RekapNilaiPage = () => {
                     <CardFooter className="p-5 pt-0">
                       <Button
                         className="w-full shadow-sm group-hover:bg-primary/90 transition-colors"
-                        onClick={() => setActiveEvent(event)}
+                        onClick={() => handleSetActiveEvent(event)}
                       >
                         {isAdminView ? "Lihat Rekap Nilai" : "Mulai Penilaian"}
                         <ArrowRight className="ml-2 h-4 w-4" />

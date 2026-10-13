@@ -28,3 +28,14 @@ yarn-error.log*
 /build/
 *.tsbuildinfo
 next-env.d.ts
+
+# Uploads & User Generated Files
+backend/uploads/users/
+backend/uploads/teams/
+backend/uploads/events/
+!backend/uploads/**/.gitkeep
+
+# Local Scratch & Documents
+catatan-demo.docx
+data_user_input.xlsx
+backend/scratch/

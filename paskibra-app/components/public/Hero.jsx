@@ -1,7 +1,38 @@
+"use client";
+
+import { useEffect, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { PlayCircle, ArrowRight, Sparkles } from "lucide-react";
+import {
+  motion,
+  useInView,
+  useMotionValue,
+  useTransform,
+  animate,
+} from "framer-motion";
+
+// Sub-komponen untuk counter animasi
+const AnimatedCounter = ({ from = 0, to, decimals = 0, suffix = "" }) => {
+  const ref = useRef(null);
+  const isInView = useInView(ref, { once: true, margin: "-50px" });
+  const count = useMotionValue(from);
+
+  const rounded = useTransform(
+    count,
+    (latest) => Number(latest).toFixed(decimals) + suffix,
+  );
+
+  useEffect(() => {
+    if (isInView) {
+      const controls = animate(count, to, { duration: 2.5, ease: "easeOut" });
+      return controls.stop;
+    }
+  }, [isInView, count, to]);
+
+  return <motion.span ref={ref}>{rounded}</motion.span>;
+};
 
 const Hero = () => {
   return (
@@ -16,7 +47,7 @@ const Hero = () => {
         <div className="absolute inset-0 bg-[linear-gradient(rgba(0,0,0,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(0,0,0,0.02)_1px,transparent_1px)] bg-[size:64px_64px] dark:bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] [mask-image:radial-gradient(ellipse_at_center,black_20%,transparent_80%)]"></div>
       </div>
 
-      <div className="container mx-auto px-4 py-12 sm:py-16 lg:py-20">
+      <div className="container mx-auto px-4 py-20 sm:py-16 lg:py-20">
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
           {/* Left Side - Text Content */}
           <div className="relative z-10 space-y-8">
@@ -34,7 +65,7 @@ const Hero = () => {
                 Platform Penjurian
               </span>
               <span className="block bg-gradient-to-r from-red-600 via-pink-600 to-red-600 dark:from-red-400 dark:via-pink-400 dark:to-red-400 bg-clip-text text-transparent">
-                Paskibra Modern
+                Modern
               </span>
             </h1>
 
@@ -78,7 +109,7 @@ const Hero = () => {
             <div className="flex flex-wrap gap-8 pt-4">
               <div className="space-y-1">
                 <div className="text-3xl font-bold text-gray-900 dark:text-white">
-                  500+
+                  <AnimatedCounter to={500} suffix="+" />
                 </div>
                 <div className="text-sm text-gray-600 dark:text-gray-400">
                   Event Terlaksana
@@ -86,7 +117,7 @@ const Hero = () => {
               </div>
               <div className="space-y-1">
                 <div className="text-3xl font-bold text-gray-900 dark:text-white">
-                  10K+
+                  <AnimatedCounter to={10} suffix="K+" />
                 </div>
                 <div className="text-sm text-gray-600 dark:text-gray-400">
                   Tim Terdaftar
@@ -94,7 +125,7 @@ const Hero = () => {
               </div>
               <div className="space-y-1">
                 <div className="text-3xl font-bold text-gray-900 dark:text-white">
-                  99.9%
+                  <AnimatedCounter to={99.9} decimals={1} suffix="%" />
                 </div>
                 <div className="text-sm text-gray-600 dark:text-gray-400">
                   Uptime
@@ -110,8 +141,8 @@ const Hero = () => {
               {/* Main Image Container */}
               <div className="relative group">
                 <Image
-                  src="https://gdb.voanews.com/01000000-0aff-0242-fabd-08db9ec4c17e_w1023_r1_s.jpg"
-                  alt="PaskibraApp Mockup"
+                  src="/heroimage.png"
+                  alt="KomandoApp Mockup"
                   width={1200}
                   height={800}
                   className="rounded-2xl shadow-2xl transform transition-all duration-700 group-hover:scale-[1.02] group-hover:rotate-1"
@@ -132,9 +163,6 @@ const Hero = () => {
           </div>
         </div>
       </div>
-
-      {/* Bottom Wave Separator */}
-      <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-white dark:from-gray-950 to-transparent"></div>
     </section>
   );
 };

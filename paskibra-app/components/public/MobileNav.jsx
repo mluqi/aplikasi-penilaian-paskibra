@@ -2,14 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, CalendarDays, Info, PhoneCall } from "lucide-react";
+import { Home, CalendarDays, Info, PhoneCall, Trophy } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navLinks = [
   { name: "Home", href: "/", icon: Home },
   { name: "Events", href: "/events", icon: CalendarDays },
+  { name: "Results", href: "/results", icon: Trophy },
   { name: "Tentang", href: "/about", icon: Info },
-  { name: "Kontak", href: "/contact", icon: PhoneCall },
 ];
 
 const MobileNav = () => {

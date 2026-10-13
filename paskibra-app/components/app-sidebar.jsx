@@ -12,11 +12,13 @@ import {
   ClipboardList,
   CalendarDays,
   Settings,
+  KeyRound,
   UserCog,
   UserRoundPlus,
   History,
   PieChart,
   Logs,
+  Braces,
 } from "lucide-react";
 
 import { NavMain } from "@/components/nav-main";
@@ -75,6 +77,13 @@ export function AppSidebar({ ...props }) {
           accessKey: "view_statistics",
           isActive: pathname.startsWith("/admin/statistics"),
         },
+        {
+          title: "List Events",
+          url: "/admin/list-events",
+          icon: CalendarDays,
+          accessKey: "view_list_events",
+          isActive: pathname.startsWith("/admin/list-events"),
+        },
       ],
     },
     {
@@ -107,6 +116,13 @@ export function AppSidebar({ ...props }) {
           icon: CalendarDays,
           accessKey: "manage_events",
           isActive: pathname.startsWith("/admin/events"),
+        },
+        {
+          title: "Tambah Juri",
+          url: "/admin/add-juri",
+          icon: UserRoundPlus,
+          accessKey: "manage_juri",
+          isActive: pathname.startsWith("/admin/add-juri"),
         },
       ],
     },
@@ -148,11 +164,30 @@ export function AppSidebar({ ...props }) {
           isActive: pathname.startsWith("/admin/log-akses"),
         },
         {
+          title: "Log API",
+          url: "/admin/log-api",
+          icon: Braces,
+          accessKey: "view_api_log",
+          isActive: pathname.startsWith("/admin/log-api"),
+        },
+        {
           title: "Hak Akses",
           url: "/admin/role-access",
           icon: Settings,
           accessKey: "manage_role_access",
           isActive: pathname.startsWith("/admin/role-access"),
+        },
+      ],
+    },
+    {
+      title: "Settings",
+      items: [
+        {
+          title: "Management API Key",
+          url: "/admin/settings/management-key",
+          icon: KeyRound,
+          accessKey: "manage_apikeys",
+          isActive: pathname.startsWith("/admin/settings/management-key"),
         },
       ],
     },
@@ -167,7 +202,7 @@ export function AppSidebar({ ...props }) {
           </div>
           <div className="flex flex-col group-data-[state=collapsed]:hidden transition-opacity">
             <span className="text-base font-bold tracking-tight leading-none text-foreground">
-              PaskibraApp
+              KomandoApp
             </span>
             <span className="text-[10px] font-medium text-muted-foreground mt-1.5 uppercase tracking-widest leading-none">
               Sistem Penilaian

@@ -134,7 +134,7 @@ export default function PendingUsersPage() {
 
       <main className="flex flex-1 flex-col gap-4 p-4 pt-0">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-semibold">Persetujuan Pengguna</h1>
+          <h1 className="text-lg sm:text-2xl font-bold tracking-tight">Persetujuan Pengguna</h1>
         </div>
         {pendingUsers.length === 0 ? (
           <Alert>

@@ -13,6 +13,11 @@ module.exports = (sequelize, DataTypes) => {
       Aspeks.hasMany(models.SubAspeks, {
         foreignKey: "aspek_id",
       });
+      Aspeks.belongsToMany(models.Event_juri, {
+        through: models.Event_juri_aspeks,
+        foreignKey: "aspek_id",
+        otherKey: "event_juri_id",
+      });
     }
   }
   Aspeks.init(
@@ -32,7 +37,6 @@ module.exports = (sequelize, DataTypes) => {
         onDelete: "CASCADE",
       },
       nama_aspek: { type: DataTypes.STRING, allowNull: false },
-      bobot: { type: DataTypes.DECIMAL(5, 2), allowNull: false },
       urutan: DataTypes.INTEGER,
     },
     {
@@ -40,7 +44,7 @@ module.exports = (sequelize, DataTypes) => {
       modelName: "Aspeks",
       tableName: "Aspeks",
       timestamps: false,
-    }
+    },
   );
   return Aspeks;
 };

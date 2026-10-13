@@ -17,16 +17,27 @@ const {
   deleteSubAspek,
   getAllAspekSubAspek,
   getAspekSubAspekByPenilaianId,
+  exportAspekExcel,
+  importAspekExcel,
 } = require("../controllers/aspekSubAspekController");
 
 // Semua rute di bawah ini memerlukan token dan peran 'admin' atau 'koordinator'
-router.use(verifyToken, authorizeRoles("superadmin", "admin", "koordinator", "juri"));
+router.use(
+  verifyToken,
+  authorizeRoles("superadmin", "admin", "koordinator", "juri", "asisten_juri"),
+);
 
 // Route: /api/aspek
 router
   .route("/")
   .post(createAspek) // Buat aspek baru, butuh event_id di body
   .get(getAllAspeks); // Dapatkan semua aspek
+
+// Route: /api/aspek/export/:event_id
+router.get("/export/:event_id", exportAspekExcel);
+
+// Route: /api/aspek/import/:event_id
+router.post("/import/:event_id", importAspekExcel);
 
 // Route: /api/aspek/:aspek_id
 router

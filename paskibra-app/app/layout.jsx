@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  title: "Paskibra App",
-  description: "Aplikasi Penilaian Paskibra",
+  title: "Komando App",
+  description: "Aplikasi Penilaian",
 };
 
 export default function RootLayout({ children }) {

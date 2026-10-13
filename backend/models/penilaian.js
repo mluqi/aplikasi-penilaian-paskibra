@@ -12,6 +12,7 @@ module.exports = (sequelize, DataTypes) => {
       Penilaian.belongsTo(models.Events, { foreignKey: "event_id" });
       Penilaian.belongsTo(models.Teams, { foreignKey: "team_id" });
       Penilaian.belongsTo(models.Users, { foreignKey: "juri_id" });
+      Penilaian.belongsTo(models.Users, { as: "Asisten", foreignKey: "asisten_id" });
       Penilaian.hasMany(models.AspekNilais, { foreignKey: "penilaian_id" });
     }
   }
@@ -51,10 +52,20 @@ module.exports = (sequelize, DataTypes) => {
         onUpdate: "CASCADE",
         onDelete: "CASCADE",
       },
+      asisten_id: {
+        type: DataTypes.STRING,
+        allowNull: true,
+        references: {
+          model: "Users",
+          key: "user_id",
+        },
+        onUpdate: "CASCADE",
+        onDelete: "SET NULL",
+      },
       total_nilai: {
-        type: DataTypes.DECIMAL(5, 2),
+        type: DataTypes.INTEGER,
         allowNull: false,
-        defaultValue: 0.0,
+        defaultValue: 0,
       },
       catatan: {
         type: DataTypes.TEXT,
@@ -71,7 +82,7 @@ module.exports = (sequelize, DataTypes) => {
       modelName: "Penilaian",
       tableName: "Penilaians",
       timestamps: false,
-    }
+    },
   );
   return Penilaian;
 };

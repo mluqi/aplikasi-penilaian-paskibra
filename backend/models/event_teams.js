@@ -46,13 +46,21 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.BIGINT,
         defaultValue: 0,
       },
+      nomor_tampil: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+      },
+        surat_rekomendasi: {
+          type: DataTypes.TEXT,
+          allowNull: true,
+        },
     },
     {
       sequelize,
       modelName: "Event_teams",
       tableName: "Event_teams",
       timestamps: false,
-    }
+    },
   );
   return Event_teams;
 };

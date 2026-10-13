@@ -41,6 +41,13 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+
+  /* Kustomisasi Breakpoints Layar (Screens) */
+  --breakpoint-sm: 640px;
+  --breakpoint-md: 724px;
+  --breakpoint-lg: 1024px;
+  --breakpoint-xl: 1280px;
+  --breakpoint-2xl: 1536px;
 }
 
 :root {
@@ -121,3 +128,29 @@
   }
 }
 
+@media print {
+  body {
+    background-color: white !important;
+    color: black !important;
+  }
+  /* Sembunyikan elemen UI non-cetak saat mencetak pada mobile/tablet */
+  [data-sidebar="sidebar"],
+  aside,
+  header,
+  nav,
+  .print\:hidden {
+    display: none !important;
+  }
+  .print\:block {
+    display: block !important;
+  }
+  .certificate-print-container {
+    display: block !important;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 297mm;
+    height: 210mm;
+    z-index: 99999;
+  }
+}

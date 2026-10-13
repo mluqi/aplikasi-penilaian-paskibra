@@ -46,8 +46,7 @@ function TargetAudience() {
             <span className="text-red-600 dark:text-red-400">Setiap Peran</span>
           </h2>
           <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
-            Platform yang memahami kebutuhan unik setiap pihak dalam lomba
-            Paskibra.
+            Platform yang memahami kebutuhan unik setiap pihak dalam lomba.
           </p>
         </div>
 

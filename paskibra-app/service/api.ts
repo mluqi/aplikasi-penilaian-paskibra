@@ -1,7 +1,8 @@
 import axios, { InternalAxiosRequestConfig } from "axios";
 
 const instance = axios.create({
-  baseURL: "http://localhost:8000/api", // Ubah ke localhost untuk konsistensi
+  // baseURL: "/api",
+  baseURL: "http://localhost:8000/api",
   withCredentials: true,
 });
 

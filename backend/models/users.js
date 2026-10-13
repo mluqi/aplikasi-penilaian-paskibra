@@ -11,6 +11,7 @@ module.exports = (sequelize, DataTypes) => {
       // define association here
       Users.hasMany(models.Teams, { foreignKey: "koordinator_id" });
       Users.hasMany(models.Event_juri, { foreignKey: "juri_id" });
+      Users.hasMany(models.Event_asisten, { foreignKey: "asisten_id" });
       Users.hasMany(models.Penilaian, { foreignKey: "juri_id" });
     }
   }
@@ -28,8 +29,14 @@ module.exports = (sequelize, DataTypes) => {
         "admin",
         "juri",
         "koordinator_team",
-        "koordinator_event"
+        "koordinator_event",
+        "asisten_juri",
       ),
+      status: {
+        type: DataTypes.ENUM("pending", "active", "inactive"),
+        allowNull: false,
+        defaultValue: "pending",
+      },
       is_active: {
         type: DataTypes.BOOLEAN,
         allowNull: false,
@@ -42,7 +49,7 @@ module.exports = (sequelize, DataTypes) => {
       sequelize,
       modelName: "Users",
       tableName: "Users",
-    }
+    },
   );
   return Users;
 };

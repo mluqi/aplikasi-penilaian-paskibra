@@ -14,7 +14,11 @@ const storage = multer.diskStorage({
   },
   filename: function (req, file, cb) {
     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    const prefix = file.fieldname === "event_juknis" ? "juknis-" : "poster-";
+    let prefix = "file-";
+    if (file.fieldname === "event_juknis") prefix = "juknis-";
+    else if (file.fieldname === "event_poster") prefix = "poster-";
+    else if (file.fieldname === "surat_rekomendasi") prefix = "surat-rekomendasi-";
+
     cb(null, prefix + uniqueSuffix + path.extname(file.originalname));
   },
 });

@@ -29,10 +29,10 @@ import { cn } from "@/lib/utils";
 
 // ─── semua konstanta & helper tetap sama ────────────────────────────────────
 const kategoriOptions = [
+    { value: "sd", label: "SD/Sederajat" },
   { value: "smp", label: "SMP/Sederajat" },
   { value: "sma_smk", label: "SMA/Sederajat" },
-  { value: "mahasiswa", label: "Mahasiswa" },
-  { value: "umum", label: "Umum" },
+  { value: "umum", label: "Umum/Purna" },
 ];
 
 const tingkatOptions = [
@@ -208,8 +208,8 @@ export default function EventsPage() {
       <main className="flex-grow">
         <PageHeader
           breadcrumb="Event"
-          title="Jelajahi Event Paskibra"
-          subtitle="Temukan berbagai kompetisi Paskibra yang akan datang dan lihat hasil dari event yang telah berlalu."
+          title="Jelajahi Event"
+          subtitle="Temukan berbagai kompetisi yang akan datang dan lihat hasil dari event yang telah berlalu."
         />
 
         <section className="pb-16 sm:pb-24">
@@ -394,83 +394,82 @@ export default function EventsPage() {
                     <motion.div
                       variants={itemVariants}
                       key={event.event_id}
-                      className="group flex flex-col rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm transition-all duration-300 hover:shadow-xl hover:-translate-y-1.5"
+                      className="h-full"
                     >
-                      {/* ── POSTER — portrait aspect ratio 2/3 ── */}
-                      <div
-                        className="relative w-full overflow-hidden"
-                        style={{ aspectRatio: "2/3" }}
+                      <Link
+                        href={`/events/${event.event_id}`}
+                        className="group flex flex-col h-full rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm transition-all duration-300 hover:shadow-xl hover:-translate-y-0.5 cursor-pointer block"
                       >
-                        <Image
-                          src={
-                            event.event_poster
-                              ? `${process.env.NEXT_PUBLIC_API_URL}${event.event_poster}`
-                              : "/default-poster.png"
-                          }
-                          alt={`Poster ${event.event_name}`}
-                          fill
-                          className="object-cover transition-transform duration-500 group-hover:scale-105"
-                        />
-
-                        {/* Gradient overlay bawah */}
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent pointer-events-none" />
-
-                        {/* Badge kategori & tingkat — floating atas kiri */}
-                        <div className="absolute top-2 sm:top-3 left-2 sm:left-3 flex flex-wrap gap-1 sm:gap-1.5 z-10">
-                          {event.event_kategori && (
-                            <span className="text-[8px] sm:text-[10px] font-semibold uppercase tracking-wide px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full backdrop-blur-md bg-white/15 border border-white/25 text-white">
-                              {kategoriLabel}
-                            </span>
-                          )}
-                          {event.event_tingkat && (
-                            <span className="text-[8px] sm:text-[10px] font-semibold uppercase tracking-wide px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full backdrop-blur-md bg-primary/80 border border-primary/40 text-primary-foreground">
-                              {tingkatLabel}
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Date chip — pojok kanan bawah poster */}
-                        <div className="absolute bottom-2 sm:bottom-3 right-2 sm:right-3 z-10 flex flex-col items-center bg-black/55 backdrop-blur-md border border-white/15 rounded-lg sm:rounded-xl px-2 sm:px-3 py-1 sm:py-2 leading-none">
-                          <span className="text-sm sm:text-xl font-bold text-amber-400">
-                            {day}
-                          </span>
-                          <span className="text-[7px] sm:text-[9px] uppercase tracking-widest text-white/60 mt-0.5">
-                            {month}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* ── CARD BODY ── */}
-                      <div className="flex flex-col flex-grow p-2.5 sm:p-4 gap-1.5 sm:gap-2">
-                        {/* Judul */}
-                        <h2 className="text-xs sm:text-sm font-bold text-gray-900 dark:text-white leading-snug line-clamp-2">
-                          {event.event_name}
-                        </h2>
-
-                        {/* Deskripsi */}
-                        <p className="text-[10px] sm:text-xs text-muted-foreground leading-relaxed line-clamp-2">
-                          {event.event_deskripsi}
-                        </p>
-
-                        {/* Lokasi */}
-                        <div className="flex items-center gap-1 sm:gap-1.5 text-[10px] sm:text-xs text-muted-foreground mt-auto pt-1">
-                          <MapPin className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0 opacity-60" />
-                          <span className="truncate">
-                            {event.event_kota}, {event.event_provinsi}
-                          </span>
-                        </div>
-
-                        {/* CTA */}
-                        <Button
-                          asChild
-                          variant="outline"
-                          className="mt-1 sm:mt-2 w-full rounded-lg sm:rounded-xl border-gray-200 dark:border-gray-700 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-colors duration-200 h-7 sm:h-9 text-[10px] sm:text-sm"
+                        {/* ── POSTER — portrait aspect ratio 2/3 ── */}
+                        <div
+                          className="relative w-full overflow-hidden"
+                          style={{ aspectRatio: "2/3" }}
                         >
-                          <Link href={`/events/${event.event_id}`}>
+                          <Image
+                            src={
+                              event.event_poster
+                                ? `${process.env.NEXT_PUBLIC_API_URL}${event.event_poster}`
+                                : "/default-poster.png"
+                            }
+                            alt={`Poster ${event.event_name}`}
+                            fill
+                            className="object-cover transition-transform duration-500 group-hover:scale-101"
+                          />
+
+                          {/* Gradient overlay bawah */}
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent pointer-events-none" />
+
+                          {/* Badge kategori & tingkat — floating atas kiri */}
+                          <div className="absolute top-2 sm:top-3 left-2 sm:left-3 flex flex-wrap gap-1 sm:gap-1.5 z-10">
+                            {event.event_kategori && (
+                              <span className="text-[8px] sm:text-[10px] font-semibold uppercase tracking-wide px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full backdrop-blur-md bg-white/15 border border-white/25 text-white">
+                                {kategoriLabel}
+                              </span>
+                            )}
+                            {event.event_tingkat && (
+                              <span className="text-[8px] sm:text-[10px] font-semibold uppercase tracking-wide px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full backdrop-blur-md bg-primary/80 border border-primary/40 text-primary-foreground">
+                                {tingkatLabel}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Date chip — pojok kanan bawah poster */}
+                          <div className="absolute bottom-2 sm:bottom-3 right-2 sm:right-3 z-10 flex flex-col items-center bg-black/55 backdrop-blur-md border border-white/15 rounded-lg sm:rounded-xl px-2 sm:px-3 py-1 sm:py-2 leading-none">
+                            <span className="text-sm sm:text-xl font-bold text-amber-400">
+                              {day}
+                            </span>
+                            <span className="text-[7px] sm:text-[9px] uppercase tracking-widest text-white/60 mt-0.5">
+                              {month}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* ── CARD BODY ── */}
+                        <div className="flex flex-col flex-grow p-2.5 sm:p-4 gap-1.5 sm:gap-2">
+                          {/* Judul */}
+                          <h2 className="text-xs sm:text-sm font-bold text-gray-900 dark:text-white leading-snug line-clamp-2 group-hover:text-primary transition-colors">
+                            {event.event_name}
+                          </h2>
+
+                          {/* Deskripsi */}
+                          <p className="text-[10px] sm:text-xs text-muted-foreground leading-relaxed line-clamp-2">
+                            {event.event_deskripsi}
+                          </p>
+
+                          {/* Lokasi */}
+                          <div className="flex items-center gap-1 sm:gap-1.5 text-[10px] sm:text-xs text-muted-foreground mt-auto pt-1">
+                            <MapPin className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0 opacity-60" />
+                            <span className="truncate">
+                              {event.event_kota}, {event.event_provinsi}
+                            </span>
+                          </div>
+
+                          {/* CTA */}
+                          <div className="mt-1 sm:mt-2 w-full rounded-lg sm:rounded-xl border border-gray-200 dark:border-gray-700 font-medium group-hover:bg-primary group-hover:text-primary-foreground group-hover:border-primary transition-colors duration-200 h-7 sm:h-9 text-[10px] sm:text-sm flex items-center justify-center">
                             Lihat Detail
-                          </Link>
-                        </Button>
-                      </div>
+                          </div>
+                        </div>
+                      </Link>
                     </motion.div>
                   );
                 })

@@ -4,49 +4,21 @@ import { Check } from "lucide-react";
 
 const pricingList = [
   {
-    title: "Gratis",
-    price: "Rp 0",
-    period: "/ event",
-    description: "Coba fitur dasar untuk event kecil Anda.",
-    features: [
-      "Hingga 10 Tim Peserta",
-      "Hingga 3 Juri",
-      "Manajemen Aspek Dasar",
-      "Rekapitulasi Nilai Otomatis",
-    ],
-    buttonText: "Mulai Gratis",
-    isFeatured: false,
-  },
-  {
-    title: "Pro",
-    price: "Rp 250k",
-    period: "/ event",
-    description: "Fitur lengkap untuk event yang lebih profesional.",
-    features: [
-      "Semua di paket Gratis",
-      "Hingga 50 Tim Peserta",
-      "Hingga 10 Juri",
-      "Manajemen Koordinator Tim",
-      "Export data (PDF, Excel)",
-      "Dukungan Prioritas",
-    ],
-    buttonText: "Pilih Paket Pro",
-    isFeatured: true,
-  },
-  {
-    title: "Enterprise",
-    price: "Kustom",
+    title: "Paket Layanan Event",
+    price: "Hubungi Kami",
     period: "",
-    description: "Solusi khusus untuk event skala besar atau kebutuhan unik.",
+    description:
+      "Solusi lengkap dan terintegrasi untuk menyukseskan event Anda.",
     features: [
-      "Semua di paket Pro",
       "Jumlah Tim & Juri Tanpa Batas",
-      "Custom Branding",
-      "Dedicated Support",
-      "Integrasi API",
+      "Sistem Penilaian Real-time",
+      "Manajemen E-Voting (QRIS)",
+      "Rekapitulasi Nilai Otomatis",
+      "Export Data (PDF, Excel)",
+      "Dukungan Teknis Penuh",
     ],
-    buttonText: "Hubungi Kami",
-    isFeatured: false,
+    buttonText: "Hubungi Marketing via WhatsApp",
+    isFeatured: true,
   },
 ];
 
@@ -69,31 +41,23 @@ function Pricing() {
             </span>
           </h2>
           <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
-            Pilih paket yang paling cocok untuk skala dan kebutuhan event
-            Paskibra Anda.
+            Dapatkan penawaran terbaik untuk menyelenggarakan event 
+            berskala kecil maupun besar.
           </p>
         </div>
 
         {/* Pricing Cards Grid */}
         <div className="mx-auto max-w-6xl">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-center">
+          <div className="grid grid-cols-1 max-w-md mx-auto gap-8 items-center">
             {pricingList.map((plan) => (
               <div
                 key={plan.title}
                 className={`relative flex flex-col rounded-xl border p-8 transition-all duration-300 ${
                   plan.isFeatured
-                    ? "border-red-600 dark:border-red-500 shadow-2xl scale-105 bg-red-50/30 dark:bg-red-900/10"
+                    ? "border-red-600 dark:border-red-500 shadow-2xl bg-red-50/30 dark:bg-red-900/10"
                     : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:shadow-lg hover:-translate-y-1"
                 }`}
               >
-                {plan.isFeatured && (
-                  <div className="absolute top-0 -translate-y-1/2 w-full flex justify-center">
-                    <span className="text-xs font-semibold px-4 py-1 bg-red-600 text-white rounded-full">
-                      Paling Populer
-                    </span>
-                  </div>
-                )}
-
                 <div className="flex-1">
                   <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
                     {plan.title}
@@ -126,7 +90,10 @@ function Pricing() {
                 </div>
 
                 <button
-                  className={`w-full py-3 px-6 rounded-lg font-medium transition-all duration-300 ${
+                  onClick={() =>
+                    window.open("https://wa.me/6287717555589", "_blank")
+                  }
+                  className={`w-full py-3 px-6 rounded-lg font-medium transition-all duration-300 cursor-pointer ${
                     plan.isFeatured
                       ? "bg-red-600 text-white hover:bg-red-700 shadow-md hover:shadow-lg"
                       : "bg-gray-100 text-gray-800 hover:bg-gray-200 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600"

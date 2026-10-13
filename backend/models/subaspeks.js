@@ -33,7 +33,12 @@ module.exports = (sequelize, DataTypes) => {
         onDelete: "CASCADE",
       },
       nama_subaspek: DataTypes.STRING,
-      bobot: DataTypes.DECIMAL(5, 2),
+      kategori: DataTypes.STRING,
+      nilai_kurang_sekali: DataTypes.STRING,
+      nilai_kurang: DataTypes.STRING,
+      nilai_cukup: DataTypes.STRING,
+      nilai_baik: DataTypes.STRING,
+      nilai_sangat_baik: DataTypes.STRING,
       urutan: DataTypes.INTEGER,
     },
     {
@@ -41,7 +46,7 @@ module.exports = (sequelize, DataTypes) => {
       modelName: "SubAspeks",
       tableName: "SubAspeks",
       timestamps: false,
-    }
+    },
   );
   return SubAspeks;
 };

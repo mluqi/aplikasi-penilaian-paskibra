@@ -1,8 +1,10 @@
 const { Users } = require("../models");
+const { Op } = require("sequelize");
 const bcrypt = require("bcrypt");
 const fs = require("fs");
 const { logAktivitas } = require("../services/logService");
 const path = require("path");
+const { generateNextUserId, getRolePrefix } = require("../utils/idGenerator");
 
 // Helper untuk menghapus foto lama agar tidak menumpuk di server
 const deleteOldPhoto = (photoPath) => {
@@ -39,27 +41,13 @@ exports.createUser = async (req, res) => {
       "juri",
       "koordinator_team",
       "koordinator_event",
+      "asisten_juri",
     ];
     if (!validRoles.includes(user_role)) {
       return res.status(400).json({ message: "Role tidak valid." });
     }
 
-    const lastUser = await Users.findOne({
-      where: { user_role },
-      order: [["createdAt", "DESC"]],
-    });
-    let newIdNumber = 1;
-    if (lastUser) {
-      const lastId = lastUser.user_id;
-      const lastIdNumber = parseInt(lastId.slice(3), 10);
-      newIdNumber = lastIdNumber + 1;
-    }
-    let prefix = "JRI";
-    if (user_role === "admin") prefix = "ADM";
-    if (user_role === "koordinator_team") prefix = "KOT";
-    if (user_role === "koordinator_event") prefix = "KOE";
-
-    const newUserId = `${prefix}${String(newIdNumber).padStart(4, "0")}`;
+    const newUserId = await generateNextUserId(user_role);
 
     // Hash password sebelum menyimpan
     const hashedPassword = await bcrypt.hash(user_password, 10);
@@ -74,6 +62,7 @@ exports.createUser = async (req, res) => {
     let executedQuery;
     const createData = {
       user_id: newUserId,
+      status: "active",
       user_name,
       user_email,
       user_password: hashedPassword,
@@ -118,13 +107,188 @@ exports.createUser = async (req, res) => {
   }
 };
 
+exports.importUsersExcel = async (req, res) => {
+  const t = await require("../models").sequelize.transaction();
+  try {
+    const { excel_data } = req.body;
+    if (!excel_data) {
+      await t.rollback();
+      return res.status(400).json({ message: "Data Excel tidak ditemukan." });
+    }
+
+    const xlsx = require("xlsx");
+    const buffer = Buffer.from(excel_data, "base64");
+    const workbook = xlsx.read(buffer, { type: "buffer" });
+    const sheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[sheetName];
+    const rows = xlsx.utils.sheet_to_json(worksheet);
+
+    if (!rows || rows.length === 0) {
+      await t.rollback();
+      return res
+        .status(400)
+        .json({ message: "File Excel kosong atau format tidak valid." });
+    }
+
+    const roleIdCounters = {};
+    const getNextIdForRole = async (role) => {
+      const rolePrefix = getRolePrefix(role);
+      if (roleIdCounters[rolePrefix] === undefined) {
+        const usersWithPrefix = await Users.findAll({
+          where: {
+            user_id: { [Op.like]: `${rolePrefix}%` },
+          },
+          attributes: ["user_id"],
+          transaction: t,
+          raw: true,
+        });
+
+        let maxNum = 0;
+        for (const u of usersWithPrefix) {
+          if (u.user_id) {
+            const match = u.user_id.match(/\d+/);
+            if (match) {
+              const num = parseInt(match[0], 10);
+              if (!isNaN(num) && num > maxNum) {
+                maxNum = num;
+              }
+            }
+          }
+        }
+        roleIdCounters[rolePrefix] = maxNum;
+      }
+
+      roleIdCounters[rolePrefix]++;
+      let candidateId = `${rolePrefix}${String(roleIdCounters[rolePrefix]).padStart(4, "0")}`;
+      while (
+        await Users.findOne({ where: { user_id: candidateId }, transaction: t })
+      ) {
+        roleIdCounters[rolePrefix]++;
+        candidateId = `${rolePrefix}${String(roleIdCounters[rolePrefix]).padStart(4, "0")}`;
+      }
+      return candidateId;
+    };
+
+    const usersToInsert = [];
+    const emailsInExcel = new Set();
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const excelRowNumber = i + 2; // Baris 1 adalah header, jadi data dimulai dari baris 2
+
+      // Mendukung nama kolom "user_name" atau "Nama"
+      const user_name = row["user_name"] || row["Nama"] || row["Nama Lengkap"];
+      const user_email =
+        row["user_email"] || row["Email"] || row["Alamat Email"];
+      const rawPassword = row["user_password"] || row["Password"];
+      const user_role =
+        row["user_role"] || row["Role"] || row["role"] || "koordinator_team";
+
+      if (!user_name || !user_email || !rawPassword) {
+        await t.rollback();
+        return res.status(400).json({
+          message: `Gagal mengimpor pada Baris ke-${excelRowNumber}: Terdapat data yang tidak lengkap (Nama, Email, atau Password kosong).`,
+        });
+      }
+
+      if (emailsInExcel.has(user_email)) {
+        await t.rollback();
+        return res.status(400).json({
+          message: `Gagal mengimpor pada Baris ke-${excelRowNumber}: Terdapat duplikasi email (${user_email}) di dalam file Excel.`,
+        });
+      }
+      emailsInExcel.add(user_email);
+
+      const existingUser = await Users.findOne({
+        where: { user_email },
+        transaction: t,
+      });
+      if (existingUser) {
+        await t.rollback();
+        return res.status(400).json({
+          message: `Gagal mengimpor pada Baris ke-${excelRowNumber}: Email ${user_email} sudah terdaftar di sistem.`,
+        });
+      }
+
+      const newUserId = await getNextIdForRole(user_role);
+      const hashedPassword = await bcrypt.hash(String(rawPassword), 10);
+
+      usersToInsert.push({
+        user_id: newUserId,
+        user_name: String(user_name),
+        user_email: String(user_email),
+        user_password: hashedPassword,
+        user_role: String(user_role),
+        status: "active",
+        is_active: true,
+      });
+    }
+
+    if (usersToInsert.length > 0) {
+      await Users.bulkCreate(usersToInsert, { transaction: t });
+    }
+
+    await t.commit();
+
+    logAktivitas({
+      target: "Import Excel",
+      action: "IMPORT_USERS",
+      detail: `Berhasil import ${usersToInsert.length} user.`,
+      owner: req.user.id,
+    });
+
+    res.status(200).json({
+      message: `${usersToInsert.length} pengguna berhasil diimpor.`,
+    });
+  } catch (error) {
+    await t.rollback();
+    console.error("Error importing users:", error);
+    res
+      .status(500)
+      .json({ message: "Terjadi kesalahan saat import data pengguna." });
+  }
+};
+
 exports.getAllUsers = async (req, res) => {
   try {
-    const users = await Users.findAll({
+    const { page, limit, search } = req.query;
+    const { Op } = require("sequelize");
+
+    const whereClause = { status: { [Op.ne]: "pending" } };
+
+    if (search) {
+      whereClause[Op.or] = [
+        { user_name: { [Op.like]: `%${search}%` } },
+        { user_email: { [Op.like]: `%${search}%` } },
+      ];
+    }
+
+    const findOptions = {
+      where: whereClause,
       attributes: { exclude: ["user_password", "user_token"] },
-      where: { is_active: true },
       order: [["createdAt", "ASC"]],
-    });
+    };
+
+    if (page && limit) {
+      const parsedLimit = parseInt(limit, 10);
+      const parsedPage = parseInt(page, 10);
+      const offset = (parsedPage - 1) * parsedLimit;
+
+      const totalItems = await Users.count({ where: findOptions.where });
+
+      findOptions.limit = parsedLimit;
+      findOptions.offset = offset;
+
+      const users = await Users.findAll(findOptions);
+      return res.status(200).json({
+        users,
+        totalItems,
+        totalPages: Math.ceil(totalItems / parsedLimit),
+        currentPage: parsedPage,
+      });
+    }
+
+    const users = await Users.findAll(findOptions);
     res.status(200).json(users);
   } catch (error) {
     console.error(error);
@@ -135,7 +299,7 @@ exports.getAllUsers = async (req, res) => {
 exports.getPendingUsers = async (req, res) => {
   try {
     const pendingUsers = await Users.findAll({
-      where: { is_active: false },
+      where: { status: "pending" },
       attributes: { exclude: ["user_password", "user_token"] },
       order: [["createdAt", "ASC"]],
     });
@@ -188,6 +352,7 @@ exports.updateUser = async (req, res) => {
         "juri",
         "koordinator_team",
         "koordinator_event",
+        "asisten_juri",
       ];
       if (!validRoles.includes(user_role)) {
         return res.status(400).json({ message: "Role tidak valid." });
@@ -314,7 +479,7 @@ exports.updateCurrentUser = async (req, res) => {
 
       const isMatch = await bcrypt.compare(
         current_password,
-        user.user_password
+        user.user_password,
       );
       if (!isMatch) {
         return res.status(400).json({ message: "Password saat ini salah." });
@@ -372,6 +537,66 @@ exports.updateCurrentUser = async (req, res) => {
   }
 };
 
+exports.toggleUserStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const user = await Users.findByPk(id);
+
+    if (!user) {
+      return res.status(404).json({ message: "User tidak ditemukan." });
+    }
+
+    if (user.user_id === req.user.id) {
+      return res
+        .status(400)
+        .json({ message: "Anda tidak dapat menonaktifkan akun Anda sendiri." });
+    }
+
+    if (user.status === "pending") {
+      return res.status(400).json({
+        message:
+          "User ini berstatus pending. Gunakan fitur 'Approve' untuk mengaktifkan.",
+      });
+    }
+
+    user.status = user.status === "active" ? "inactive" : "active";
+
+    let executedQuery;
+    await user.save({ logging: (sql) => (executedQuery = sql) });
+
+    // Log aktivitas
+    logAktivitas({
+      target: id,
+      action: user.is_active ? "ACTIVATE" : "DEACTIVATE",
+      detail: "SUCCESS",
+      query: executedQuery,
+      data: { is_active: user.is_active },
+      owner: req.user.id,
+    });
+
+    res.status(200).json({
+      message: `User berhasil ${user.is_active ? "diaktifkan" : "dinonaktifkan"}.`,
+      user: {
+        id: user.user_id,
+        name: user.user_name,
+        email: user.user_email,
+        role: user.user_role,
+        is_active: user.is_active,
+      },
+    });
+  } catch (error) {
+    console.error(error);
+    logAktivitas({
+      target: req.params.id,
+      action: "CHANGE_STATUS_FAILED",
+      detail: `Error: ${error.message}`,
+      query: null,
+      owner: req.user.id,
+    });
+    res.status(500).json({ message: "Terjadi kesalahan server." });
+  }
+};
+
 exports.approveUser = async (req, res) => {
   const t = await require("../models").sequelize.transaction();
   try {
@@ -386,28 +611,13 @@ exports.approveUser = async (req, res) => {
       return res.status(400).json({ message: "User sudah aktif." });
     }
 
-    const lastUser = await Users.findOne({
-      where: {
-        user_role: user.user_role,
-        is_active: true,
-        user_id: { [require("sequelize").Op.notLike]: "TMP%" }, // Abaikan ID sementara
-      },
-      order: [["user_id", "DESC"]],
-      transaction: t,
-    });
-
-    let newIdNumber = 1;
-    if (lastUser && lastUser.user_id.match(/\d+/)) {
-      // Mengambil angka dari belakang ID, lebih aman jika prefix bervariasi
-      const lastIdNumber = parseInt(lastUser.user_id.match(/\d+$/)[0], 10);
-      newIdNumber = lastIdNumber + 1;
+    if (user.status !== "pending") {
+      return res
+        .status(400)
+        .json({ message: "User ini tidak berstatus pending." });
     }
 
-    let prefix = "JRI";
-    if (user.user_role === "koordinator_team") prefix = "KOT";
-    if (user.user_role === "koordinator_event") prefix = "KOE";
-
-    const newUserId = `${prefix}${String(newIdNumber).padStart(4, "0")}`;
+    const newUserId = await generateNextUserId(user.user_role, t);
 
     // 1. Buat user baru dengan ID permanen dan data dari user sementara
     let executedQuery;
@@ -418,8 +628,9 @@ exports.approveUser = async (req, res) => {
       user_password: user.user_password,
       user_role: user.user_role,
       user_photo: user.user_photo,
-      is_active: true, // Langsung aktifkan
-      createdAt: user.createdAt, // Pertahankan tanggal registrasi asli
+      status: "active",
+      is_active: true,
+      createdAt: user.createdAt,
       updatedAt: new Date(),
     };
     await Users.create(approveData, {

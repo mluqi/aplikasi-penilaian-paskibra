@@ -40,7 +40,7 @@ module.exports = (sequelize, DataTypes) => {
         onUpdate: "CASCADE",
         onDelete: "CASCADE",
       },
-      nilai_akhir: DataTypes.DECIMAL(5, 2),
+      nilai_akhir: DataTypes.INTEGER,
       jumlah_juri: DataTypes.INTEGER,
     },
     {
@@ -48,7 +48,7 @@ module.exports = (sequelize, DataTypes) => {
       modelName: "RekapNilai",
       tableName: "rekapnilai",
       timestamps: false,
-    }
+    },
   );
   return RekapNilai;
 };

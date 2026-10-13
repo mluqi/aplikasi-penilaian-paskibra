@@ -38,10 +38,10 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
         defaultValue: 0,
       },
-      donor_name: DataTypes.STRING,
-      payment_status: DataTypes.STRING, // contoh: 'PENDING', 'PAID', 'FAILED'
+      payment_status: DataTypes.STRING, 
       xendit_transaction_id: DataTypes.STRING,
       payment_method: DataTypes.STRING,
+      webhook_data: DataTypes.TEXT,
     },
     {
       sequelize,

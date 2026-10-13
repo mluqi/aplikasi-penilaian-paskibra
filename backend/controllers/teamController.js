@@ -45,7 +45,7 @@ exports.createTeam = async (req, res) => {
     }
 
     // Generate a unique team_id TM0001
-    const lastTeam = await Teams.findOne({ order: [["createdAt", "DESC"]] });
+    const lastTeam = await Teams.findOne({ order: [["team_id", "DESC"]] });
     let team_id = "TM0001";
     if (lastTeam) {
       const lastIdNum = parseInt(lastTeam.team_id.replace("TM", ""), 10);
@@ -53,10 +53,20 @@ exports.createTeam = async (req, res) => {
       team_id = "TM" + newIdNum.toString().padStart(4, "0");
     }
 
-    // Dapatkan path logo jika diunggah
     let team_logo = null;
-    if (req.file) {
-      team_logo = `/uploads/teams/${req.file.filename}`;
+    let foto_all_team = null;
+
+    // Deteksi jika menggunakan upload.fields() atau upload.single()
+    if (req.files && !Array.isArray(req.files)) {
+      if (req.files.team_logo)
+        team_logo = `/uploads/teams/${req.files.team_logo[0].filename}`;
+      if (req.files.foto_all_team)
+        foto_all_team = `/uploads/teams/${req.files.foto_all_team[0].filename}`;
+    } else if (req.file) {
+      if (req.file.fieldname === "team_logo")
+        team_logo = `/uploads/teams/${req.file.filename}`;
+      if (req.file.fieldname === "foto_all_team")
+        foto_all_team = `/uploads/teams/${req.file.filename}`;
     }
 
     let executedQuery;
@@ -66,6 +76,7 @@ exports.createTeam = async (req, res) => {
       team_sekolah_instansi,
       team_jumlah_anggota,
       team_logo,
+      foto_all_team,
       koordinator_id,
     };
     const newTeam = await Teams.create(createData, {
@@ -102,6 +113,8 @@ exports.createTeam = async (req, res) => {
 exports.getAllTeams = async (req, res) => {
   try {
     const { id: userId, role: userRole } = req.user; // Diambil dari middleware verifyToken
+    const { page, limit, search, event_id, instansi } = req.query;
+    const { Op } = require("sequelize");
 
     const findOptions = {
       // Tentukan atribut yang ingin diambil secara eksplisit
@@ -136,9 +149,74 @@ exports.getAllTeams = async (req, res) => {
       order: [["createdAt", "DESC"]],
     };
 
+    findOptions.where = {};
+
+    if (event_id) {
+      findOptions.include.push({
+        model: Event_teams,
+        attributes: [],
+        where: { event_id },
+      });
+    }
+
     // Jika pengguna adalah koordinator, filter tim berdasarkan ID mereka
     if (userRole === "koordinator_team") {
-      findOptions.where = { koordinator_id: userId };
+      findOptions.where.koordinator_id = userId;
+    }
+
+    if (search) {
+      findOptions.where[Op.or] = [
+        { team_name: { [Op.like]: `%${search}%` } },
+        { team_sekolah_instansi: { [Op.like]: `%${search}%` } },
+      ];
+    }
+
+    if (instansi) {
+      const searchInstansi = instansi.toUpperCase();
+      if (searchInstansi === "SMA") {
+        findOptions.where.team_sekolah_instansi = {
+          [Op.or]: [
+            { [Op.like]: "%SMA%" },
+            { [Op.like]: "%SMK%" },
+            { [Op.like]: "%MA %" },
+            { [Op.like]: "%MAN %" },
+          ],
+        };
+      } else if (searchInstansi === "SMP") {
+        findOptions.where.team_sekolah_instansi = {
+          [Op.or]: [{ [Op.like]: "%SMP%" }, { [Op.like]: "%MTS%" }],
+        };
+      } else if (searchInstansi === "SD") {
+        findOptions.where.team_sekolah_instansi = {
+          [Op.or]: [{ [Op.like]: "%SD%" }, { [Op.like]: "%MI %" }],
+        };
+      } else {
+        // UMUM atau lainnya
+        findOptions.where.team_sekolah_instansi = {
+          [Op.like]: `%${instansi}%`,
+        };
+      }
+    }
+
+    if (page && limit) {
+      const parsedLimit = parseInt(limit, 10);
+      const parsedPage = parseInt(page, 10);
+      const offset = (parsedPage - 1) * parsedLimit;
+
+      findOptions.limit = parsedLimit;
+      findOptions.offset = offset;
+      findOptions.subQuery = false;
+
+      const { count, rows: teams } = await Teams.findAndCountAll(findOptions);
+
+      const totalItems = Array.isArray(count) ? count.length : count;
+
+      return res.status(200).json({
+        teams,
+        totalItems,
+        totalPages: Math.ceil(totalItems / parsedLimit),
+        currentPage: parsedPage,
+      });
     }
 
     const teams = await Teams.findAll(findOptions);
@@ -162,7 +240,13 @@ exports.getTeamById = async (req, res) => {
               attributes: ["event_id", "event_name", "event_tanggal"],
             },
           ],
-          attributes: ["event_id", "balance", "xenplatform_id"],
+          attributes: [
+            "event_id",
+            "balance",
+            "xenplatform_id",
+            "nomor_tampil",
+            "surat_rekomendasi",
+          ],
         },
         {
           model: Users,
@@ -209,10 +293,26 @@ exports.updateTeam = async (req, res) => {
     }
 
     let team_logo = team.team_logo;
-    if (req.file) {
-      // Hapus logo lama jika ada
-      deleteOldLogo(team.team_logo);
-      team_logo = `/uploads/teams/${req.file.filename}`;
+    let foto_all_team = team.foto_all_team;
+
+    if (req.files && !Array.isArray(req.files)) {
+      if (req.files.team_logo) {
+        deleteOldLogo(team.team_logo);
+        team_logo = `/uploads/teams/${req.files.team_logo[0].filename}`;
+      }
+      if (req.files.foto_all_team) {
+        deleteOldLogo(team.foto_all_team);
+        foto_all_team = `/uploads/teams/${req.files.foto_all_team[0].filename}`;
+      }
+    } else if (req.file) {
+      if (req.file.fieldname === "team_logo") {
+        deleteOldLogo(team.team_logo);
+        team_logo = `/uploads/teams/${req.file.filename}`;
+      }
+      if (req.file.fieldname === "foto_all_team") {
+        deleteOldLogo(team.foto_all_team);
+        foto_all_team = `/uploads/teams/${req.file.filename}`;
+      }
     }
 
     let executedQuery;
@@ -221,6 +321,7 @@ exports.updateTeam = async (req, res) => {
       team_sekolah_instansi,
       team_jumlah_anggota,
       team_logo,
+      foto_all_team,
       koordinator_id,
     };
     await team.update(updateData, { logging: (sql) => (executedQuery = sql) });
@@ -258,6 +359,8 @@ exports.deleteTeam = async (req, res) => {
     }
     let executedQuery;
     const teamName = team.team_name;
+    deleteOldLogo(team.foto_all_team); // Hapus foto grup
+    deleteOldLogo(team.team_logo); // Hapus logo lama
     await team.destroy({ logging: (sql) => (executedQuery = sql) });
 
     // Log aktivitas

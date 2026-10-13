@@ -1,8 +1,10 @@
 const { Users, role_access } = require("../models");
+const { Op } = require("sequelize");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const { logAkses } = require("../services/logService");
 const { getClientIp, getClientBrowser } = require("../utils/requestUtils");
+const { generateNextUserId } = require("../utils/idGenerator");
 
 exports.login = async (req, res) => {
   const { user_email, user_password } = req.body;
@@ -17,7 +19,7 @@ exports.login = async (req, res) => {
     }
 
     // Cek apakah akun sudah aktif
-    if (!user.is_active) {
+    if (!user.is_active || user.status === "inactive") {
       // Catat upaya login yang gagal (akun tidak aktif)
       logAkses({ id: user.user_id, ip, browser, status: "Gagal" });
       return res.status(403).json({
@@ -42,7 +44,6 @@ exports.login = async (req, res) => {
     const token = jwt.sign(
       { id: user.user_id, role: user.user_role },
       process.env.JWT_SECRET,
-      { expiresIn: "24h" }
     );
 
     user.user_token = token;
@@ -97,9 +98,8 @@ exports.register = async (req, res) => {
       return res.status(400).json({ message: "Email sudah terdaftar." });
     }
 
-    // Validasi role yang diperbolehkan untuk registrasi publik
-    const validRoles = ["juri", "koordinator_team", "koordinator_event"];
-    if (!validRoles.includes(user_role)) {
+    // Validasi role: Hanya Koordinator Tim yang boleh mendaftar secara manual
+    if (user_role !== "koordinator_team") {
       return res.status(400).json({ message: "Role tidak valid." });
     }
 
@@ -113,19 +113,8 @@ exports.register = async (req, res) => {
       user_photo = `/uploads/users/${req.file.filename}`;
     }
 
-    // Generate user_id sementara untuk user yang belum aktif
-    // ID ini akan diganti saat user di-approve oleh admin
-    const lastUser = await Users.findOne({
-      where: { user_role },
-      order: [["createdAt", "DESC"]],
-    });
-    let newIdNumber = 1;
-    if (lastUser) {
-      const lastId = lastUser.user_id;
-      const lastIdNumber = parseInt(lastId.slice(3), 10);
-      newIdNumber = lastIdNumber + 1;
-    }
-    const user_id = `TMP${String(newIdNumber).padStart(4, "0")}`; // Menggunakan prefix 'TMP' untuk sementara
+    // Generate user_id sementara untuk user yang belum aktif (TMP)
+    const user_id = await generateNextUserId("TMP");
 
     // Buat user baru dengan status tidak aktif
     await Users.create({

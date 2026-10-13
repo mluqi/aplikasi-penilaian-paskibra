@@ -13,7 +13,7 @@ export default function TermsPage() {
         <div className="container mx-auto px-4">
           <div className="prose prose-lg dark:prose-invert max-w-4xl mx-auto">
             <p>
-              Selamat datang di PaskibraApp. Syarat dan Ketentuan ("Ketentuan")
+              Selamat datang di KomandoApp. Syarat dan Ketentuan ("Ketentuan")
               ini mengatur akses Anda ke dan penggunaan situs web, layanan, dan
               aplikasi kami ("Layanan"). Dengan mengakses atau menggunakan
               Layanan, Anda setuju untuk terikat oleh Ketentuan ini.
@@ -46,14 +46,14 @@ export default function TermsPage() {
             <h2>4. Hak Kekayaan Intelektual</h2>
             <p>
               Layanan dan semua konten di dalamnya, termasuk teks, grafik, logo,
-              dan perangkat lunak, adalah milik PaskibraApp atau pemberi
+              dan perangkat lunak, adalah milik KomandoApp atau pemberi
               lisensinya dan dilindungi oleh undang-undang hak cipta dan merek
               dagang.
             </p>
 
             <h2>5. Pembatasan Tanggung Jawab</h2>
             <p>
-              Sejauh diizinkan oleh hukum yang berlaku, PaskibraApp tidak akan
+              Sejauh diizinkan oleh hukum yang berlaku, KomandoApp tidak akan
               bertanggung jawab atas kerugian tidak langsung, insidental,
               khusus, konsekuensial, atau hukuman, atau kerugian apa pun atas
               keuntungan atau pendapatan.

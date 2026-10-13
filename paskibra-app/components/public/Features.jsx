@@ -81,7 +81,7 @@ export default function Features() {
           <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-4 transition-colors duration-300">
             Semua yang Anda Butuhkan untuk{" "}
             <span className="text-red-600 dark:text-red-400">
-              Event Paskibra Profesional
+              Event Lomba Profesional
             </span>
           </h2>
           <p className="text-gray-600 dark:text-gray-400 leading-relaxed">

@@ -38,12 +38,12 @@ module.exports = (sequelize, DataTypes) => {
         onUpdate: "CASCADE",
         onDelete: "CASCADE",
       },
-      nilai_aspek: DataTypes.DECIMAL(5, 2),
+      nilai_aspek: DataTypes.INTEGER,
     },
     {
       sequelize,
       modelName: "AspekNilais",
-    }
+    },
   );
   return AspekNilais;
 };

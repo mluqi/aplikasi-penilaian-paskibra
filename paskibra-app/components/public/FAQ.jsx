@@ -1,12 +1,19 @@
+"use client";
+
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { ChevronDown } from "lucide-react";
 
 const faqList = [
+  {
+    question:
+      "Bagaimana cara mendaftar sebagai Koordinator Tim, Koordinator Event, atau Juri?",
+    answer:
+      "Untuk Koordinator Tim, Anda dapat mendaftar langsung melalui tombol 'Register'. Akun Anda akan berstatus 'Pending' dan perlu disetujui oleh Admin. Untuk menjadi Koordinator Event, Anda perlu menghubungi tim marketing kami melalui halaman 'Pricing' untuk proses pembayaran, setelah itu akun akan dibuatkan oleh Admin. Sedangkan akun Juri akan dibuatkan langsung oleh Admin atau Koordinator Event yang bertugas.",
+  },
   {
     question: "Apakah data kami aman di platform ini?",
     answer:
@@ -83,7 +90,12 @@ const FAQ = () => {
               </div>
 
               {/* CTA Button */}
-              <button className="mt-8 group inline-flex items-center gap-2 px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-all duration-300 shadow-sm hover:shadow-md">
+              <button
+                onClick={() =>
+                  window.open("https://wa.me/6287717555589", "_blank")
+                }
+                className="mt-8 group inline-flex items-center gap-2 px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-all duration-300 shadow-sm hover:shadow-md cursor-pointer"
+              >
                 Butuh Bantuan Lain?
                 <svg
                   className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-1"
@@ -111,7 +123,7 @@ const FAQ = () => {
                   value={`item-${index}`}
                   className="border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 px-6 transition-all duration-300 hover:border-red-200 dark:hover:border-red-800 hover:shadow-sm"
                 >
-                  <AccordionTrigger className="py-6 text-left hover:no-underline group">
+                  <AccordionTrigger className="py-6 text-left hover:no-underline group cursor-pointer">
                     <div className="flex items-center justify-between w-full">
                       <span className="font-semibold text-gray-900 dark:text-white group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors duration-300 pr-4 text-base">
                         {faq.question}
@@ -129,7 +141,12 @@ const FAQ = () => {
             <div className="mt-8 p-6 border border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-800/50">
               <p className="text-sm text-gray-600 dark:text-gray-400 text-center">
                 Tidak menemukan jawaban yang Anda cari?{" "}
-                <button className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 font-medium transition-colors duration-300">
+                <button
+                  onClick={() =>
+                    window.open("https://wa.me/6287717555589", "_blank")
+                  }
+                  className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 font-medium transition-colors duration-300 cursor-pointer"
+                >
                   Hubungi tim support kami
                 </button>
               </p>

@@ -37,7 +37,7 @@ const values = [
     icon: Lightbulb,
     title: "Inovasi Berkelanjutan",
     description:
-      "Terus mengembangkan teknologi untuk menjawab tantangan dan meningkatkan kualitas penyelenggaraan lomba Paskibra.",
+      "Terus mengembangkan teknologi untuk menjawab tantangan dan meningkatkan kualitas penyelenggaraan lomba.",
   },
 ];
 
@@ -74,8 +74,8 @@ export default function AboutPage() {
       {/* Section 1: Hero */}
       <PageHeader
         breadcrumb="Tentang Kami"
-        title="Meningkatkan Standar Lomba Paskibra"
-        subtitle="Kami percaya bahwa semangat, disiplin, dan sportivitas dalam Paskibra layak didukung oleh teknologi yang modern, adil, dan transparan."
+        title="Meningkatkan Standar Lomba"
+        subtitle="Kami percaya bahwa semangat, disiplin, dan sportivitas dalam lomba layak didukung oleh teknologi yang modern, adil, dan transparan."
       />
 
       {/* Section 2: Our Story */}
@@ -101,7 +101,7 @@ export default function AboutPage() {
                 Dari Kertas ke Cloud: Kisah Kami
               </h2>
               <p className="text-lg text-gray-600 dark:text-gray-400 leading-relaxed mb-6">
-                PaskibraApp lahir dari pengamatan langsung di lapangan. Kami
+                KomandoApp lahir dari pengamatan langsung di lapangan. Kami
                 melihat panitia yang kewalahan dengan tumpukan kertas, juri yang
                 kesulitan merekap nilai, dan peserta yang cemas menunggu hasil
                 yang tak kunjung tiba.
@@ -150,7 +150,7 @@ export default function AboutPage() {
             </h2>
             <p className="text-lg text-muted-foreground">
               Fondasi utama dalam setiap baris kode yang kami tulis dan layanan
-              yang kami berikan kepada ekosistem Paskibra.
+              yang kami berikan kepada ekosistem lomba.
             </p>
           </motion.div>
 
@@ -205,7 +205,7 @@ export default function AboutPage() {
             <div className="absolute bottom-0 left-0 -mb-10 -ml-10 w-40 h-40 bg-black opacity-10 rounded-full blur-2xl"></div>
 
             <h2 className="text-3xl md:text-5xl font-extrabold mb-6 drop-shadow-md">
-              Mari Bergabung dengan Revolusi Digital Paskibra
+              Mari Bergabung dengan Revolusi Digital Lomba
             </h2>
             <p className="text-lg md:text-xl text-red-100 max-w-2xl mx-auto mb-10 leading-relaxed">
               Siap untuk menyelenggarakan event yang lebih profesional,

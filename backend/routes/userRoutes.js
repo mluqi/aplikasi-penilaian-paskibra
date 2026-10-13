@@ -13,7 +13,9 @@ const {
   updateUser,
   deleteUser,
   updateCurrentUser,
+  toggleUserStatus,
   approveUser,
+  importUsersExcel,
 } = require("../controllers/userController");
 
 // Semua rute di bawah ini memerlukan token yang valid
@@ -22,36 +24,42 @@ router.use(verifyToken);
 // Rute untuk pengguna mengelola profil mereka sendiri
 router.put(
   "/profile",
-  authorizeRoles("superadmin", "admin", "juri", "koordinator"),
+  authorizeRoles("superadmin", "admin", "juri", "koordinator", "asisten_juri"),
   upload.single("user_photo"),
-  updateCurrentUser
+  updateCurrentUser,
 );
 
 router.get("/pending", authorizeRoles("superadmin", "admin"), getPendingUsers);
 router.patch(
   "/approve/:id",
   authorizeRoles("superadmin", "admin"),
-  approveUser
+  approveUser,
 );
 
 // --- Rute di bawah ini hanya untuk Admin ---
 router.get(
   "/",
   authorizeRoles("superadmin", "admin", "koordinator", "juri"),
-  getAllUsers
+  getAllUsers,
 );
+router.post("/import", authorizeRoles("superadmin", "admin"), importUsersExcel);
 router.post(
   "/",
   authorizeRoles("superadmin", "admin"),
   upload.single("user_photo"),
-  createUser
+  createUser,
+);
+router.patch(
+  "/:id/toggle-status",
+  authorizeRoles("superadmin", "admin"),
+  toggleUserStatus,
 );
 router.get("/:id", authorizeRoles("superadmin", "admin"), getUserById);
 router.put(
   "/:id",
   authorizeRoles("superadmin", "admin"),
   upload.single("user_photo"),
-  updateUser
+  updateUser,
 );
 router.delete("/:id", authorizeRoles("superadmin", "admin"), deleteUser);
 

@@ -8,6 +8,9 @@ const {
   Teams,
   RekapNilai,
   Events,
+  Event_juri,
+  Team_penalties,
+  Event_penalties,
   sequelize,
 } = require("../models");
 
@@ -137,68 +140,93 @@ exports.getPenilaianDetailByTeam = async (req, res) => {
       whereClause.juri_id = userId;
     }
     // Menggunakan Promise.all untuk mengambil data secara paralel
-    const [penilaianDetails, rekapSummary, aspectSummary] = await Promise.all([
-      // 1. Ambil detail penilaian dari setiap juri
-      Penilaian.findAll({
-        where: whereClause,
-        include: [
-          {
-            model: Users,
-            as: "User",
-            attributes: ["user_id", "user_name", "user_photo"],
-          },
-          {
-            model: AspekNilais,
-            include: [
-              {
-                model: SubAspekNilais,
-                include: [{ model: SubAspeks, attributes: ["nama_subaspek"] }],
-              },
-              { model: Aspeks, attributes: ["nama_aspek"] },
-            ],
-          },
-          {
-            model: Teams,
-            attributes: ["team_id", "team_name", "team_sekolah_instansi"],
-          },
-          { model: Events, attributes: ["event_id", "event_name"] },
-        ],
-        order: [
-          ["juri_id", "ASC"],
-          [AspekNilais, "aspek_id", "ASC"],
-        ],
-      }),
-      // 2. Ambil data rekapitulasi akhir
-      RekapNilai.findOne({
-        where: { event_id, team_id },
-      }),
-      // 3. Ambil rata-rata nilai per aspek
-      AspekNilais.findAll({
-        attributes: [
-          [sequelize.fn("AVG", sequelize.col("nilai_aspek")), "avg_score"],
-        ],
-        include: [
-          {
-            model: Penilaian,
-            attributes: [],
-            where: { event_id, team_id },
-            required: true,
-          },
-          {
-            model: Aspeks,
-            attributes: ["nama_aspek"],
-            required: true,
-          },
-        ],
-        group: ["Aspek.aspek_id"],
-        order: [[Aspeks, "urutan", "ASC"]],
-        raw: true,
-      }),
-    ]);
+    const [penilaianDetails, rekapSummary, aspectSummary, teamPenalties] =
+      await Promise.all([
+        // 1. Ambil detail penilaian dari setiap juri
+        Penilaian.findAll({
+          where: whereClause,
+          include: [
+            {
+              model: Users,
+              as: "User",
+              attributes: ["user_id", "user_name", "user_photo"],
+            },
+            {
+              model: Users,
+              as: "Asisten",
+              attributes: ["user_id", "user_name"],
+            },
+            {
+              model: AspekNilais,
+              include: [
+                {
+                  model: SubAspekNilais,
+                  include: [
+                    {
+                      model: SubAspeks,
+                      attributes: ["subaspek_id", "nama_subaspek", "kategori"],
+                    },
+                  ],
+                },
+                { model: Aspeks, attributes: ["nama_aspek"] },
+              ],
+            },
+            {
+              model: Teams,
+              attributes: ["team_id", "team_name", "team_sekolah_instansi"],
+            },
+            { model: Events, attributes: ["event_id", "event_name"] },
+          ],
+          order: [
+            ["juri_id", "ASC"],
+            [AspekNilais, "aspek_id", "ASC"],
+          ],
+        }),
+        // 2. Ambil data rekapitulasi akhir
+        RekapNilai.findOne({
+          where: { event_id, team_id },
+        }),
+        // 3. Ambil total penjumlahan nilai per aspek dari semua juri
+        AspekNilais.findAll({
+          attributes: [
+            [sequelize.fn("SUM", sequelize.col("nilai_aspek")), "total_score"],
+          ],
+          include: [
+            {
+              model: Penilaian,
+              attributes: [],
+              where: { event_id, team_id },
+              required: true,
+            },
+            {
+              model: Aspeks,
+              attributes: ["nama_aspek"],
+              required: true,
+            },
+          ],
+          group: ["Aspek.aspek_id"],
+          order: [[Aspeks, "urutan", "ASC"]],
+          raw: true,
+        }),
+        // 4. Ambil detail penalti spesifik untuk tim ini
+        Team_penalties.findAll({
+          where: { event_id, team_id },
+          include: [
+            {
+              model: Event_penalties,
+              as: "event_penalty",
+              attributes: ["nama_pelanggaran", "poin_potongan"],
+            },
+          ],
+        }),
+      ]);
 
     res.status(200).json({
       details: penilaianDetails,
-      summary: rekapSummary,
+      summary: {
+        ...(rekapSummary ? rekapSummary.toJSON() : {}),
+        penalty_details: teamPenalties,
+      },
       aspectSummary,
     });
   } catch (error) {
@@ -213,12 +241,15 @@ exports.getPenilaianDetailByTeam = async (req, res) => {
 exports.getSubmittedTeams = async (req, res) => {
   try {
     const { event_id } = req.query;
-    const { id: juri_id } = req.user;
+    let { id: juri_id, role: userRole } = req.user;
 
-    if (!event_id || !juri_id) {
-      return res
-        .status(400)
-        .json({ message: "event_id dan juri_id diperlukan." });
+    // Jika Asisten Juri, juri_id yang dicari berasal dari query parameter (jika ada)
+    if (userRole === "asisten_juri" && req.query.juri_id) {
+      juri_id = req.query.juri_id;
+    }
+
+    if (!event_id) {
+      return res.status(400).json({ message: "event_id diperlukan." });
     }
 
     const submissions = await Penilaian.findAll({
@@ -239,19 +270,23 @@ exports.getSubmittedTeams = async (req, res) => {
  * Mengunci sebuah penilaian agar tidak bisa diedit lagi.
  */
 exports.lockPenilaian = async (req, res) => {
-  const { id: juriId } = req.user;
+  const { id: userId, role: userRole } = req.user;
   const { penilaian_id } = req.params;
 
   try {
-    const penilaian = await Penilaian.findOne({
-      where: { penilaian_id, juri_id: juriId },
-    });
+    const penilaian = await Penilaian.findByPk(penilaian_id);
 
     if (!penilaian) {
       return res.status(404).json({
         message:
           "Penilaian tidak ditemukan atau Anda tidak berhak mengaksesnya.",
       });
+    }
+
+    if (userRole === "juri" && penilaian.juri_id !== userId) {
+      return res
+        .status(403)
+        .json({ message: "Anda tidak berhak mengaksesnya." });
     }
 
     penilaian.is_lock = true;
@@ -301,7 +336,13 @@ exports.updatePenilaian = async (req, res) => {
   try {
     const { penilaian_id } = req.params;
     const { catatan, penilaian_detail, event_id, team_id } = req.body;
-    const { id: juriId } = req.user;
+    let { id: juriId, role: userRole } = req.user;
+    let asistenId = null;
+
+    if (userRole === "asisten_juri") {
+      juriId = req.body.juri_id || juriId;
+      asistenId = req.user.id;
+    }
 
     // 1. Cari penilaian yang ada
     const penilaian = await Penilaian.findOne({
@@ -322,58 +363,66 @@ exports.updatePenilaian = async (req, res) => {
         .json({ message: "Penilaian terkunci dan tidak dapat diubah." });
     }
 
+    // 2.5 Validasi Otorisasi Juri terhadap Aspek
+    const juriAssignment = await Event_juri.findOne({
+      where: { event_id, juri_id: juriId },
+      include: [{ model: Aspeks }],
+      transaction: t,
+    });
+
+    if (
+      !juriAssignment ||
+      !juriAssignment.Aspeks ||
+      juriAssignment.Aspeks.length === 0
+    ) {
+      await t.rollback();
+      return res.status(403).json({
+        message:
+          "Anda belum ditugaskan untuk menilai aspek apapun di event ini.",
+      });
+    }
+
+    const allowedAspekIds = new Set(
+      juriAssignment.Aspeks.map((a) => a.aspek_id),
+    );
+
     // 3. Hapus detail nilai lama (AspekNilais dan SubAspekNilais terkait akan terhapus via cascade)
     await AspekNilais.destroy({ where: { penilaian_id }, transaction: t });
 
     let total_nilai_keseluruhan = 0;
     const aspekNilaiRecords = [];
 
-    // 4. Ambil data master Aspek dan SubAspek untuk perhitungan bobot
-    const masterAspeks = await Aspeks.findAll({
-      where: { event_id },
-      include: [{ model: SubAspeks, as: "SubAspeks" }],
-      transaction: t,
-    });
-
-    const aspekBobotMap = new Map(
-      masterAspeks.map((a) => [a.aspek_id, parseFloat(a.bobot)])
-    );
-    const subAspekBobotMap = new Map();
-    masterAspeks.forEach((aspek) => {
-      aspek.SubAspeks.forEach((sub) => {
-        subAspekBobotMap.set(sub.subaspek_id, parseFloat(sub.bobot));
-      });
-    });
-
-    // 5. Hitung ulang nilai berdasarkan data baru
+    // 4. Hitung ulang nilai berdasarkan data baru (Penjumlahan Langsung)
     for (const detail of penilaian_detail) {
-      let nilai_aspek_terbobot = 0;
+      if (!allowedAspekIds.has(detail.aspek_id)) {
+        await t.rollback();
+        return res.status(403).json({
+          message: `Akses ditolak: Anda tidak berhak menilai aspek ID ${detail.aspek_id}.`,
+        });
+      }
+
+      let nilai_aspek_sum = 0;
       for (const sub of detail.sub_aspek_nilai) {
-        const bobotSubAspek = subAspekBobotMap.get(sub.subaspek_id);
-        if (bobotSubAspek === undefined)
-          throw new Error(`Sub-Aspek ID ${sub.subaspek_id} tidak ditemukan.`);
-        nilai_aspek_terbobot += (parseFloat(sub.nilai) * bobotSubAspek) / 100;
+        nilai_aspek_sum += parseInt(sub.nilai || 0, 10);
       }
 
       aspekNilaiRecords.push({
         penilaian_id,
         aspek_id: detail.aspek_id,
-        nilai_aspek: nilai_aspek_terbobot,
+        nilai_aspek: nilai_aspek_sum,
         SubAspekNilais: detail.sub_aspek_nilai.map((sub) => ({
           subaspek_id: sub.subaspek_id,
           nilai: sub.nilai,
         })),
       });
 
-      const bobotAspek = aspekBobotMap.get(detail.aspek_id);
-      if (bobotAspek === undefined)
-        throw new Error(`Aspek ID ${detail.aspek_id} tidak ditemukan.`);
-      total_nilai_keseluruhan += (nilai_aspek_terbobot * bobotAspek) / 100;
+      total_nilai_keseluruhan += nilai_aspek_sum;
     }
 
     // 6. Update record Penilaian utama
-    penilaian.total_nilai = total_nilai_keseluruhan.toFixed(2);
+    penilaian.total_nilai = total_nilai_keseluruhan;
     penilaian.catatan = catatan;
+    penilaian.asisten_id = asistenId; // Null jika diupdate oleh Juri Utama, terisi jika diupdate oleh Asisten
     await penilaian.save({ transaction: t });
 
     // 7. Buat ulang record AspekNilais dan SubAspekNilais
@@ -444,21 +493,62 @@ const updateRekapNilai = async (event_id, team_id, transaction) => {
       await rekap.destroy({ transaction });
     }
   } else {
-    // Jika ada penilaian, hitung ulang dan update/create rekap
-    const totalNilaiSum = allPenilaianForTeam.reduce(
-      (sum, p) => sum + parseFloat(p.total_nilai),
-      0
-    );
-    const nilai_akhir = totalNilaiSum / jumlah_juri;
+    // Menghitung nilai akhir:
+    // Menjumlahkan (SUM) semua nilai dari semua juri yang masuk.
+    const aspekNilais = await AspekNilais.findAll({
+      attributes: [
+        "aspek_id",
+        [
+          sequelize.fn("SUM", sequelize.col("nilai_aspek")),
+          "total_nilai_aspek",
+        ],
+      ],
+      include: [
+        {
+          model: Penilaian,
+          attributes: [],
+          where: { event_id, team_id },
+          required: true,
+        },
+        {
+          model: Aspeks,
+          attributes: [],
+          required: true,
+        },
+      ],
+      group: ["AspekNilais.aspek_id"],
+      transaction,
+    });
+
+    // Menghitung total pengurangan penalti untuk tim ini
+    const totalPenalti = await Team_penalties.sum("total_pengurangan", {
+      where: { event_id, team_id },
+      transaction,
+    });
+
+    // Pastikan angka absolut untuk mencegah kasus double minus (--15 jadi +15)
+    const pengurangan = totalPenalti ? Math.abs(totalPenalti) : 0;
+
+    let nilai_akhir = 0;
+    aspekNilais.forEach((record) => {
+      const sum_nilai = parseInt(
+        record.getDataValue("total_nilai_aspek") || 0,
+        10,
+      );
+      nilai_akhir += sum_nilai; // Penjumlahan total semua nilai aspek
+    });
+
+    // Kurangi nilai akhir dengan jumlah penalti
+    nilai_akhir -= pengurangan;
 
     if (rekap) {
       // Jika rekap sudah ada, UPDATE
       await rekap.update(
         {
-          nilai_akhir: parseFloat(nilai_akhir.toFixed(2)),
+          nilai_akhir,
           jumlah_juri,
         },
-        { transaction }
+        { transaction },
       );
     } else {
       // Jika rekap belum ada, CREATE
@@ -468,14 +558,16 @@ const updateRekapNilai = async (event_id, team_id, transaction) => {
           rekapnilai_id,
           event_id,
           team_id,
-          nilai_akhir: parseFloat(nilai_akhir.toFixed(2)),
+          nilai_akhir,
           jumlah_juri,
         },
-        { transaction }
+        { transaction },
       );
     }
   }
 };
+
+exports.updateRekapNilai = updateRekapNilai;
 
 /**
  * Controller untuk membuat data penilaian baru beserta detail aspek dan sub-aspeknya.
@@ -487,85 +579,101 @@ exports.createPenilaian = async (req, res) => {
 
   try {
     const { event_id, team_id, catatan, penilaian_detail } = req.body;
-    const { id: juriId } = req.user;
+    let { id: juriId, role: userRole } = req.user;
+    let asistenId = null;
+
+    if (userRole === "asisten_juri") {
+      juriId = req.body.juri_id || juriId;
+      asistenId = req.user.id;
+    }
 
     if (!juriId) {
-      return res
-        .status(400)
-        .json({ message: "juri_id tidak ditemukan dari token." });
+      await t.rollback();
+      return res.status(400).json({ message: "juri_id tidak ditemukan." });
     }
 
     // 1. Validasi input dasar
     if (!event_id || !team_id || !penilaian_detail) {
+      await t.rollback();
       return res.status(400).json({
         message: "event_id, team_id dan penilaian_detail tidak boleh kosong.",
       });
     }
 
-    let total_nilai_keseluruhan = 0;
-    const aspekNilaiRecords = [];
+    // 1.2 Mencegah Double Input (Cek apakah juri sudah pernah menilai tim ini)
+    const existingPenilaian = await Penilaian.findOne({
+      where: { event_id, team_id, juri_id: juriId },
+      transaction: t,
+    });
+    if (existingPenilaian) {
+      await t.rollback();
+      return res.status(409).json({
+        message:
+          "Anda sudah memberikan penilaian untuk tim ini. Gunakan fitur update atau muat ulang halaman.",
+      });
+    }
 
-    // 2. Mengambil semua data master Aspek dan SubAspek untuk perhitungan bobot
-    const masterAspeks = await Aspeks.findAll({
-      where: { event_id }, // Filter aspek berdasarkan event_id
-      include: [{ model: SubAspeks, as: "SubAspeks" }],
+    // 1.5 Validasi Otorisasi Juri terhadap Aspek
+    const juriAssignment = await Event_juri.findOne({
+      where: { event_id, juri_id: juriId },
+      include: [{ model: Aspeks }],
       transaction: t,
     });
 
-    // Membuat map untuk akses cepat ke bobot
-    const aspekBobotMap = new Map(
-      masterAspeks.map((a) => [a.aspek_id, parseFloat(a.bobot)])
-    );
-    const subAspekBobotMap = new Map();
-    masterAspeks.forEach((aspek) => {
-      aspek.SubAspeks.forEach((sub) => {
-        subAspekBobotMap.set(sub.subaspek_id, parseFloat(sub.bobot));
+    if (
+      !juriAssignment ||
+      !juriAssignment.Aspeks ||
+      juriAssignment.Aspeks.length === 0
+    ) {
+      await t.rollback();
+      return res.status(403).json({
+        message:
+          "Anda belum ditugaskan untuk menilai aspek apapun di event ini.",
       });
-    });
+    }
 
-    // 3. Iterasi setiap aspek yang dinilai dari input
+    const allowedAspekIds = new Set(
+      juriAssignment.Aspeks.map((a) => a.aspek_id),
+    );
+
+    let total_nilai_keseluruhan = 0;
+    const aspekNilaiRecords = [];
+
+    // 2. Iterasi setiap aspek yang dinilai dari input (Penjumlahan Langsung)
     for (const detail of penilaian_detail) {
-      let nilai_aspek_terbobot = 0;
-
-      // Iterasi setiap sub-aspek di dalam aspek
-      for (const sub of detail.sub_aspek_nilai) {
-        const bobotSubAspek = subAspekBobotMap.get(sub.subaspek_id);
-        if (bobotSubAspek === undefined) {
-          throw new Error(
-            `Sub-Aspek dengan ID ${sub.subaspek_id} tidak ditemukan.`
-          );
-        }
-        // Menghitung nilai sub-aspek yang sudah dikalikan bobotnya
-        nilai_aspek_terbobot += (parseFloat(sub.nilai) * bobotSubAspek) / 100;
+      if (!allowedAspekIds.has(detail.aspek_id)) {
+        await t.rollback();
+        return res.status(403).json({
+          message: `Akses ditolak: Anda tidak berhak menilai aspek ID ${detail.aspek_id}.`,
+        });
       }
 
-      // Menyiapkan data untuk tabel AspekNilais
+      let nilai_aspek_sum = 0;
+      for (const sub of detail.sub_aspek_nilai) {
+        nilai_aspek_sum += parseInt(sub.nilai || 0, 10);
+      }
+
       aspekNilaiRecords.push({
         aspek_id: detail.aspek_id,
-        nilai_aspek: nilai_aspek_terbobot,
-        // Menyimpan detail sub-aspek untuk dibuat nanti
+        nilai_aspek: nilai_aspek_sum,
         SubAspekNilais: detail.sub_aspek_nilai.map((sub) => ({
           subaspek_id: sub.subaspek_id,
           nilai: sub.nilai,
         })),
       });
 
-      const bobotAspek = aspekBobotMap.get(detail.aspek_id);
-      if (bobotAspek === undefined) {
-        throw new Error(`Aspek dengan ID ${detail.aspek_id} tidak ditemukan.`);
-      }
-      // Akumulasi total nilai keseluruhan
-      total_nilai_keseluruhan += (nilai_aspek_terbobot * bobotAspek) / 100;
+      total_nilai_keseluruhan += nilai_aspek_sum;
     }
 
-    // 4. Membuat record utama di tabel Penilaians
+    // 3. Membuat record utama di tabel Penilaians
     const penilaianHeader = await Penilaian.create(
       {
         penilaian_id: await generatePenilaianId(event_id, team_id),
         event_id,
         team_id,
         juri_id: juriId,
-        total_nilai: total_nilai_keseluruhan.toFixed(2),
+        asisten_id: asistenId,
+        total_nilai: total_nilai_keseluruhan,
         catatan,
         AspekNilais: aspekNilaiRecords,
       },
@@ -577,7 +685,7 @@ exports.createPenilaian = async (req, res) => {
           },
         ],
         transaction: t, // Menjalankan semua proses dalam satu transaksi
-      }
+      },
     );
 
     // 5. Update atau buat rekap nilai akhir untuk tim ini

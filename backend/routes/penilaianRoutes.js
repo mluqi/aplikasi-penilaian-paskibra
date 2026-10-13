@@ -18,15 +18,21 @@ const {
 router.patch(
   "/unlock/:penilaian_id",
   verifyToken,
-  authorizeRoles("superadmin", "admin"),
-  unlockPenilaian
+  authorizeRoles("superadmin", "admin", "koordinator_event", "asisten_juri"),
+  unlockPenilaian,
 );
 
 router.patch(
   "/lock/:penilaian_id",
   verifyToken,
-  authorizeRoles("superadmin", "admin", "juri"),
-  lockPenilaian
+  authorizeRoles(
+    "superadmin",
+    "admin",
+    "juri",
+    "koordinator_event",
+    "asisten_juri",
+  ),
+  lockPenilaian,
 );
 
 router.use(
@@ -36,18 +42,16 @@ router.use(
     "admin",
     "juri",
     "koordinator_team",
-    "koordinator_event"
-  )
+    "koordinator_event",
+    "asisten_juri",
+  ),
 );
 
 router.get("/submitted-teams", getSubmittedTeams);
 
 router.get("/detail/:event_id/:team_id", getPenilaianDetailByTeam);
 
-router
-  .route("/")
-  .post(createPenilaian) 
-  .get(getAllPenilaian); 
+router.route("/").post(createPenilaian).get(getAllPenilaian);
 
 router.put("/:penilaian_id", updatePenilaian);
 

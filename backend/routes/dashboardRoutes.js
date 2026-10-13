@@ -21,7 +21,7 @@ router.get(
 );
 router.get(
   "/juri-summary",
-  authorizeRoles("juri", "superadmin", "admin"),
+  authorizeRoles("juri", "superadmin", "admin", "asisten_juri"),
   getJuriSummary,
 );
 

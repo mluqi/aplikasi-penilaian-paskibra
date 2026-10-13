@@ -11,6 +11,7 @@ module.exports = (sequelize, DataTypes) => {
       // define association here
       Events.belongsTo(models.Users, { foreignKey: "koordinator_id" });
       Events.hasMany(models.Event_juri, { foreignKey: "event_id" });
+      Events.hasMany(models.Event_asisten, { foreignKey: "event_id" });
       Events.hasMany(models.Event_teams, { foreignKey: "event_id" });
       Events.hasMany(models.Penilaian, { foreignKey: "event_id" });
       Events.hasMany(models.Aspeks, { foreignKey: "event_id" });
@@ -25,7 +26,7 @@ module.exports = (sequelize, DataTypes) => {
         primaryKey: true,
       },
       event_name: DataTypes.STRING,
-      event_kategori: DataTypes.ENUM("smp", "sma_smk", "mahasiswa", "umum"),
+      event_kategori: DataTypes.ENUM("sd", "smp", "sma_smk", "umum"),
       event_tingkat: DataTypes.ENUM("kota_kabupaten", "provinsi", "nasional"),
       event_provinsi: DataTypes.STRING,
       event_kota: DataTypes.STRING,
@@ -37,11 +38,32 @@ module.exports = (sequelize, DataTypes) => {
       event_biaya_pendaftaran: DataTypes.BIGINT,
       event_deskripsi: DataTypes.TEXT,
       event_status: DataTypes.ENUM("draft", "published", "archived"),
+      is_result_show: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false,
+      },
       event_batas_pendaftaran: DataTypes.DATE,
       event_contact_person_name: DataTypes.STRING,
       event_contact_person_number: DataTypes.STRING,
       event_penyelenggara: DataTypes.STRING,
       event_kuota: DataTypes.INTEGER,
+      donasi_mulai: DataTypes.DATE,
+      donasi_selesai: DataTypes.DATE,
+      xenplatform_id: DataTypes.STRING,
+      xenplatform_data: DataTypes.TEXT,
+      qris_data: DataTypes.TEXT,
+      kejuaraan_template: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+      },
+      kategori_options: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+      },
+      balance: {
+        type: DataTypes.BIGINT,
+        defaultValue: 0,
+      },
       koordinator_id: {
         type: DataTypes.STRING,
         allowNull: false,

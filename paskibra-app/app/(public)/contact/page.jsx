@@ -40,7 +40,7 @@ export default function ContactPage() {
                       href="mailto:support@paskibra.app"
                       className="text-red-600 dark:text-red-400 font-medium hover:underline"
                     >
-                      support@paskibra.app
+                      info@palindo.id
                     </a>
                   </div>
                 </div>
@@ -59,7 +59,7 @@ export default function ContactPage() {
                       href="tel:+6281234567890"
                       className="text-red-600 dark:text-red-400 font-medium hover:underline"
                     >
-                      +62 812-3456-7890
+                      +62 877-1755-5589
                     </a>
                   </div>
                 </div>
@@ -72,7 +72,8 @@ export default function ContactPage() {
                       Lokasi
                     </h3>
                     <p className="text-gray-600 dark:text-gray-400">
-                      Jl. Merah Putih No. 17, Jakarta, Indonesia
+                      Jl. Tuparev. 11 Soho Patra Park Blok B.5, Kedawung, Kec.
+                      Kedawung, Kabupaten Cirebon, Jawa Barat 45153
                     </p>
                   </div>
                 </div>

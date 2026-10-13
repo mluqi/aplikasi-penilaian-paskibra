@@ -7,7 +7,7 @@ const testimonialsList = [
     name: "Ahmad Fauzi",
     role: "Ketua Pelaksana, Lomba Patriot 2023",
     quote:
-      "PaskibraApp benar-benar revolusioner. Proses rekapitulasi yang biasanya butuh berjam-jam, kini selesai dalam hitungan menit. Sangat direkomendasikan!",
+      "KomandoApp benar-benar revolusioner. Proses rekapitulasi yang biasanya butuh berjam-jam, kini selesai dalam hitungan menit. Sangat direkomendasikan!",
   },
   {
     name: "Siti Nurhaliza",

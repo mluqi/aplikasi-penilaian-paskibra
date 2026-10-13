@@ -30,6 +30,7 @@ module.exports = (sequelize, DataTypes) => {
       team_sekolah_instansi: DataTypes.STRING,
       team_jumlah_anggota: DataTypes.INTEGER,
       team_logo: DataTypes.TEXT,
+      foto_all_team: DataTypes.TEXT,
       koordinator_id: {
         type: DataTypes.STRING,
         allowNull: false,

@@ -1,6 +1,23 @@
 const { Anggota_team, Teams, sequelize } = require("../models");
 const { Op } = require("sequelize");
 const { logAktivitas } = require("../services/logService");
+const fs = require("fs");
+const path = require("path");
+
+// Helper untuk menghapus foto anggota lama
+const deleteOldPhoto = (photoPath) => {
+  if (photoPath) {
+    const relativePath = photoPath.startsWith("/")
+      ? photoPath.substring(1)
+      : photoPath;
+    const absolutePath = path.join(__dirname, "..", relativePath);
+    if (fs.existsSync(absolutePath)) {
+      fs.unlink(absolutePath, (err) => {
+        if (err) console.error("Gagal menghapus foto lama:", err);
+      });
+    }
+  }
+};
 
 /**
  * Menambahkan anggota baru ke dalam sebuah tim.
@@ -12,7 +29,7 @@ exports.createAnggota = async (req, res) => {
     anggota_nama,
     anggota_tempat_lahir,
     anggota_tanggal_lahir,
-    anggota_is_danton,
+    anggota_tipe,
   } = req.body;
 
   const t = await sequelize.transaction();
@@ -36,9 +53,9 @@ exports.createAnggota = async (req, res) => {
     }
 
     // Validasi: Pastikan hanya ada satu danton per tim
-    if (anggota_is_danton) {
+    if (anggota_tipe === "danton") {
       const existingDanton = await Anggota_team.findOne({
-        where: { team_id, anggota_is_danton: true },
+        where: { team_id, anggota_tipe: "danton" },
         transaction: t,
       });
 
@@ -52,14 +69,19 @@ exports.createAnggota = async (req, res) => {
     }
 
     // Generate ID unik untuk anggota
-    const lastAnggota = await Anggota_team.findOne(
-      { order: [["createdAt", "DESC"]] },
-      { transaction: t }
-    );
+    const lastAnggota = await Anggota_team.findOne({
+      order: [["anggota_id", "DESC"]],
+      transaction: t,
+    });
     let anggota_id = "AGT0001";
     if (lastAnggota) {
       const lastIdNum = parseInt(lastAnggota.anggota_id.replace("AGT", ""), 10);
       anggota_id = "AGT" + (lastIdNum + 1).toString().padStart(4, "0");
+    }
+
+    let anggota_foto = null;
+    if (req.file) {
+      anggota_foto = `/uploads/users/${req.file.filename}`;
     }
 
     let executedQuery;
@@ -68,7 +90,8 @@ exports.createAnggota = async (req, res) => {
       anggota_nama,
       anggota_tempat_lahir,
       anggota_tanggal_lahir,
-      anggota_is_danton: anggota_is_danton || false,
+      anggota_tipe: anggota_tipe || "anggota pasukan",
+      anggota_foto,
       team_id,
     };
     const newAnggota = await Anggota_team.create(createData, {
@@ -130,7 +153,7 @@ exports.updateAnggota = async (req, res) => {
       anggota_nama,
       anggota_tempat_lahir,
       anggota_tanggal_lahir,
-      anggota_is_danton,
+      anggota_tipe,
     } = req.body;
 
     const anggota = await Anggota_team.findByPk(anggota_id);
@@ -139,11 +162,11 @@ exports.updateAnggota = async (req, res) => {
     }
 
     // Validasi: Jika akan mengubah menjadi danton, pastikan belum ada danton lain
-    if (anggota_is_danton && anggota.anggota_is_danton === false) {
+    if (anggota_tipe === "danton" && anggota.anggota_tipe !== "danton") {
       const existingDanton = await Anggota_team.findOne({
         where: {
           team_id: anggota.team_id,
-          anggota_is_danton: true,
+          anggota_tipe: "danton",
           // Pastikan tidak memeriksa anggota yang sedang diupdate itu sendiri
           anggota_id: { [Op.ne]: anggota_id },
         },
@@ -156,12 +179,19 @@ exports.updateAnggota = async (req, res) => {
       }
     }
 
+    let anggota_foto = anggota.anggota_foto;
+    if (req.file) {
+      deleteOldPhoto(anggota.anggota_foto);
+      anggota_foto = `/uploads/users/${req.file.filename}`;
+    }
+
     let executedQuery;
     const updateData = {
       anggota_nama,
       anggota_tempat_lahir,
       anggota_tanggal_lahir,
-      anggota_is_danton,
+      anggota_tipe,
+      anggota_foto,
     };
     await anggota.update(updateData, {
       logging: (sql) => (executedQuery = sql),
@@ -213,6 +243,8 @@ exports.deleteAnggota = async (req, res) => {
 
     let executedQuery;
     const anggotaNama = anggota.anggota_nama;
+
+    deleteOldPhoto(anggota.anggota_foto); // Hapus foto dari storage
     await anggota.destroy({
       transaction: t,
       logging: (sql) => (executedQuery = sql),

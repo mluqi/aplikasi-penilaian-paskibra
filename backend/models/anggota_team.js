@@ -21,7 +21,13 @@ module.exports = (sequelize, DataTypes) => {
       anggota_nama: DataTypes.STRING,
       anggota_tempat_lahir: DataTypes.STRING,
       anggota_tanggal_lahir: DataTypes.DATE,
-      anggota_is_danton: DataTypes.BOOLEAN,
+      anggota_foto: DataTypes.TEXT,
+      anggota_tipe: DataTypes.ENUM(
+        "pelatih",
+        "danton",
+        "anggota pasukan",
+        "anggota cadangan",
+      ),
       team_id: {
         type: DataTypes.STRING,
         allowNull: false,
@@ -37,7 +43,7 @@ module.exports = (sequelize, DataTypes) => {
       sequelize,
       modelName: "Anggota_team",
       tableName: "Anggota_teams",
-    }
+    },
   );
   return Anggota_team;
 };

@@ -18,6 +18,8 @@ import {
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import ShareButtons from "@/components/shared/ShareButtons";
+import TeamList from "./TeamList";
+import EventResultsSection from "@/components/public/EventResultsSection";
 
 const capitalize = (s) => {
   if (typeof s !== "string") return "";
@@ -25,15 +27,29 @@ const capitalize = (s) => {
 };
 
 const kategoriOptions = [
+  { value: "sd", label: "SD/Sederajat" },
   { value: "smp", label: "SMP/Sederajat" },
   { value: "sma_smk", label: "SMA/Sederajat" },
-  { value: "mahasiswa", label: "Mahasiswa" },
-  { value: "umum", label: "Umum" },
+  { value: "umum", label: "Umum/Purna" },
 ];
 
 const getKategoriLabel = (value) => {
   const option = kategoriOptions.find((opt) => opt.value === value);
   return option ? option.label : value; // fallback ke value jika tidak ditemukan
+};
+
+const getCountdownText = (targetDateStr) => {
+  if (!targetDateStr) return null;
+  const target = new Date(targetDateStr);
+  target.setHours(0, 0, 0, 0);
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  const diffTime = target.getTime() - now.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+  if (diffDays > 0) return `${diffDays} hari lagi`;
+  if (diffDays === 0) return "Hari ini";
+  return "Selesai";
 };
 
 // Fungsi untuk mengambil data event berdasarkan ID
@@ -67,7 +83,7 @@ export async function generateMetadata({ params }) {
   }
 
   return {
-    title: `${event.event_name} | PaskibraApp`,
+    title: `${event.event_name} | KomandoApp`,
     description: event.event_deskripsi.substring(0, 160), // Potong untuk meta description
     openGraph: {
       title: event.event_name,
@@ -108,12 +124,26 @@ export default async function EventDetailPage({ params }) {
     ? event.Event_teams?.length >= event.event_kuota
     : false;
 
-  // Validasi apakah event sudah dimulai (hari H atau setelahnya) untuk tombol klasemen
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const eventDate = new Date(event.event_tanggal);
-  eventDate.setHours(0, 0, 0, 0);
-  const isEventStarted = today >= eventDate;
+  const now = new Date();
+  const donasiMulai = event.donasi_mulai ? new Date(event.donasi_mulai) : null;
+  const donasiSelesai = event.donasi_selesai
+    ? new Date(event.donasi_selesai)
+    : null;
+
+  const isDonationPeriodActive =
+    donasiMulai && donasiSelesai
+      ? now >= donasiMulai && now <= donasiSelesai
+      : true;
+
+  const hasActiveDonation = Boolean(event.xenplatform_id);
+
+  const sortedTeams = [...(event.Event_teams || [])].sort((a, b) => {
+    if (hasActiveDonation) {
+      const balanceDiff = (Number(b.balance) || 0) - (Number(a.balance) || 0);
+      if (balanceDiff !== 0) return balanceDiff;
+    }
+    return a.Team.team_name.localeCompare(b.Team.team_name);
+  });
 
   return (
     <div className="flex flex-col min-h-screen bg-[#F8FAFC] dark:bg-gray-950 selection:bg-red-500/30">
@@ -212,9 +242,6 @@ export default async function EventDetailPage({ params }) {
                         <span className="font-semibold text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white transition-colors">
                           {aspek.nama_aspek}
                         </span>
-                        <div className="flex items-center justify-center bg-white dark:bg-gray-900 shadow-sm border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-1.5 font-bold text-orange-600 dark:text-orange-400">
-                          {parseFloat(aspek.bobot)}%
-                        </div>
                       </div>
                     ))}
                   </div>
@@ -254,7 +281,9 @@ export default async function EventDetailPage({ params }) {
                             {juri.User?.user_name}
                           </p>
                           <p className="text-sm font-medium text-blue-600/80 dark:text-blue-400/80 mt-0.5">
-                            {juri.peran_juri || "Juri Penilai"}
+                            {juri.Aspeks && juri.Aspeks.length > 0
+                              ? juri.Aspeks.map((a) => a.nama_aspek).join(", ")
+                              : "Juri Penilai"}
                           </p>
                         </div>
                       </div>
@@ -305,46 +334,16 @@ export default async function EventDetailPage({ params }) {
                   <div className="p-2.5 bg-emerald-50 dark:bg-emerald-500/10 rounded-xl">
                     <Users className="text-emerald-600 dark:text-emerald-400 h-6 w-6" />
                   </div>
-                  Daftar Tim Peserta
+                  {hasActiveDonation
+                    ? "Peserta & Dukungan"
+                    : "Daftar Tim Peserta"}
                 </h2>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm border-separate border-spacing-y-2">
-                    <thead className="text-gray-500 dark:text-gray-400 font-semibold">
-                      <tr className="bg-transparent">
-                        <th className="px-5 py-3 text-left">Nama Tim</th>
-                        <th className="px-5 py-3 text-left">
-                          Asal Sekolah/Instansi
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {event.Event_teams?.length > 0 ? (
-                        event.Event_teams.map((t) => (
-                          <tr
-                            key={t.team_id}
-                            className="bg-gray-50/80 dark:bg-gray-800/40 hover:bg-white dark:hover:bg-gray-800 hover:shadow-sm transition-all duration-200"
-                          >
-                            <td className="px-5 py-4 font-bold text-gray-900 dark:text-white rounded-l-2xl border-y border-l border-gray-100 dark:border-gray-800">
-                              {t.Team.team_name}
-                            </td>
-                            <td className="px-5 py-4 text-gray-600 dark:text-gray-400 rounded-r-2xl border-y border-r border-gray-100 dark:border-gray-800">
-                              {t.Team.team_sekolah_instansi}
-                            </td>
-                          </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td
-                            colSpan="2"
-                            className="px-4 py-12 text-center text-gray-500 dark:text-gray-400 bg-gray-50/80 dark:bg-gray-800/40 rounded-2xl border border-dashed border-gray-200 dark:border-gray-700"
-                          >
-                            Belum ada tim peserta yang terdaftar.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
+                <TeamList
+                  sortedTeams={sortedTeams}
+                  hasActiveDonation={hasActiveDonation}
+                  event={event}
+                  isDonationPeriodActive={isDonationPeriodActive}
+                />
               </div>
             </div>
 
@@ -407,7 +406,7 @@ export default async function EventDetailPage({ params }) {
                     </Link>
                   )}
 
-                  {isEventStarted ? (
+                  {event.is_result_show ? (
                     <Link
                       href={`/events/${event.event_id}/results`}
                       className={buttonVariants({
@@ -452,6 +451,9 @@ export default async function EventDetailPage({ params }) {
                             day: "numeric",
                           },
                         )}
+                        <span className="ml-2 font-bold text-red-500 dark:text-red-400">
+                          ({getCountdownText(event.event_tanggal)})
+                        </span>
                       </p>
                       <p className="text-gray-500 dark:text-gray-400 text-sm flex items-center gap-1.5 mt-0.5">
                         <Clock className="w-3.5 h-3.5 opacity-70" /> Pukul{" "}
@@ -510,6 +512,9 @@ export default async function EventDetailPage({ params }) {
                             month: "long",
                             day: "numeric",
                           })}
+                          <span className="ml-2 font-bold text-purple-500 dark:text-purple-400">
+                            ({getCountdownText(event.event_batas_pendaftaran)})
+                          </span>
                         </p>
                       </div>
                     </div>
@@ -612,6 +617,12 @@ export default async function EventDetailPage({ params }) {
                 <ArrowLeft className="mr-2 h-4 w-4" /> Kembali ke Daftar Event
               </Link>
             </div>
+          </div>
+          {/* Section Hasil Klasemen */}
+          <div id="hasil-klasemen" className="mt-16">
+            {event.is_result_show && (
+              <EventResultsSection eventId={id} event={event} />
+            )}
           </div>
         </section>
       </main>
